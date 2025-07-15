@@ -36,7 +36,7 @@ interface ProductItem {
 
 const productItemsMap: Record<string, ProductItem[]> = {
   'Medical-Antihistamine': [
-    { id: '124216', name: 'Zyrtec 10 MG.', price: 25, discount: 0 },
+    { id: '124217', name: 'Zyrtec 10 MG.', price: 25, discount: 0 },
   ],
   'Medical-Acne/Antibiotic': [
     { id: '124218', name: 'CS', price: 2.5, discount: 0 },
