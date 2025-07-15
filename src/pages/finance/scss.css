@@ -1,0 +1,19 @@
+.text-label {
+  font-weight: 600;
+}
+
+.ant-menu-submenu-popup {
+  font-size: 12px !important;
+}
+
+/* มีปัญหาอยู่ .ant-menu-submenu-popup มันแก้ที่ ant กระทบทั้งหมด */
+.compact-menu .ant-menu-item,
+.compact-menu .ant-menu-submenu-title,
+.ant-menu-submenu-popup .ant-menu-item,
+.ant-menu-submenu-popup .ant-menu-submenu-title {
+  padding: 4px 12px !important;
+  height: auto !important;
+  line-height: 1.2 !important;
+  min-height: 24px !important;
+}
+
