@@ -41,7 +41,7 @@ const productItemsMap: Record<string, ProductItem[]> = {
   'Medical-Acne/Antibiotic': [
     { id: '124218', name: 'CS', price: 2.5, discount: 0 },
     { id: '124226', name: 'DC 500 mg.(cap)', price: 6, discount: 0 },
-    { id: '124206', name: 'ERY 250 MG.', price: 7, discount: 0 },
+    { id: '124208', name: 'ERY 250 MG.', price: 7, discount: 0 },
     { id: '124208', name: 'MX 500 MG.', price: 9, discount: 0 },
     { id: '124201', name: 'Roaccutane 10 MG.', price: 50, discount: 0 },
     { id: '124202', name: 'Roaccutane 20 MG.', price: 90, discount: 0 },
