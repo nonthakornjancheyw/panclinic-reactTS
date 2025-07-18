@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Menu, Checkbox, Button, Table, InputNumber, Select, 
   Card, Layout,ConfigProvider, Row, Col, Input, Typography, 
-  Divider, Radio
+  Divider, Radio, Space
 } from 'antd';
 const { Text } = Typography;
 import type { ColumnsType } from 'antd/es/table/interface';
@@ -11,6 +11,10 @@ import { renderCouponOptions, renderActivityOptions } from '../finance/selectOpt
 import { v4 as uuidv4 } from 'uuid';
 import { useStyle } from './styles.ts';
 import './scss.css';
+
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { registerTHSarabun } from '../../utils/pdfFonts';
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -42,7 +46,7 @@ const productItemsMap: Record<string, ProductItem[]> = {
     { id: '124218', name: 'CS', price: 2.5, discount: 0 },
     { id: '124226', name: 'DC 500 mg.(cap)', price: 6, discount: 0 },
     { id: '124208', name: 'ERY 250 MG.', price: 7, discount: 0 },
-    { id: '124208', name: 'MX 500 MG.', price: 9, discount: 0 },
+    { id: '124209', name: 'MX 500 MG.', price: 9, discount: 0 },
     { id: '124201', name: 'Roaccutane 10 MG.', price: 50, discount: 0 },
     { id: '124202', name: 'Roaccutane 20 MG.', price: 90, discount: 0 },
     { id: '124204', name: 'TC 250 MG.', price: 6, discount: 0 },
@@ -66,7 +70,7 @@ const productItemsMap: Record<string, ProductItem[]> = {
   ],
 };
 
-export default function Home() {
+export default function Finance() {
   const { styles } = useStyle();
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null);
   const [selectedAddKeys, setSelectedAddKeys] = useState<string[]>([]);
@@ -84,6 +88,60 @@ export default function Home() {
   const calculateAmount = (price: number, quantity: number, discount: number) => {
     return price * quantity * (1 - discount / 100);
   };
+
+
+  function handlePrintPDF() {
+    // สร้างเอกสาร PDF
+    const doc = new jsPDF();
+    registerTHSarabun(doc);
+
+    // ทดสอบพิมพ์ข้อความเบื้องต้น
+    doc.text('ทดสอบ PDF', 10, 10);
+
+    // เตรียมหัวตารางและข้อมูล
+    const headers = ['ชื่อสินค้า', 'จำนวน', 'ราคา', 'ส่วนลด', 'ราคารวม'];
+    const data = tableData.map(item => [
+      item.name,
+      item.quantity.toString(),
+      item.price.toFixed(2),
+      item.discount.toFixed(2),
+      item.amount.toFixed(2),
+    ]);
+
+    // ตั้งค่าฟอนต์สำหรับตารางอีกครั้งเพื่อให้แน่ใจว่าใช้ฟอนต์ไทย
+    doc.setFont('THSarabunNew', 'normal');
+
+    // สร้างตารางด้วย autoTable function (ใช้ fontStyle ปกติ)
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      styles: {
+        font: 'THSarabunNew',
+        fontStyle: 'normal',
+        fontSize: 16,
+      },
+      headStyles: {
+        fontStyle: 'normal', // เปลี่ยนเป็น normal เพราะยังไม่มีฟอนต์ bold
+      },
+      startY: 20,
+    });
+
+    // แทนการ save ให้เปิด PDF ในแท็บใหม่ และสั่งพิมพ์อัตโนมัติ
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(url);
+    if (printWindow) {
+      printWindow.focus();
+      // เมื่อโหลดเสร็จสั่งพิมพ์
+      printWindow.onload = () => {
+        printWindow.print();
+        // ปิดแท็บหลังพิมพ์ (ถ้าต้องการ)
+        // printWindow.close();
+      };
+    } else {
+      console.error('ไม่สามารถเปิดหน้าต่างพิมพ์ได้');
+    }
+  }
 
   const handleAddSelected = () => {
     const newProducts: Product[] = itemsToShow
@@ -612,6 +670,9 @@ export default function Home() {
                             ลบรายการ
                           </Button>
                         </Col>
+                        <Col>
+                            <Button style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }} onClick={handlePrintPDF}>พิมพ์ PDF</Button>
+                        </Col>
                       </Row>
                     </ConfigProvider>
 
@@ -1080,11 +1141,19 @@ export default function Home() {
                     />
                   </Col> 
                 </Row>
-                <Divider size="small" />
+
+                <Divider size="small"/>
+                
                 <Row gutter={8} style={{ marginBottom: 8 }}>
                   {/* Col 1: Label */}
-                  <Col className="text-label">ประเภทการมารับบริการ</Col>
-                  <Divider type="vertical" />
+                  <Col className="text-label">
+                    ประเภทการมารับบริการ
+                  </Col>
+
+                  <Row>
+                    <Divider variant="dashed" type="vertical" style={{ height: '100%', borderColor: '#ccc' }} dashed></Divider>
+                  </Row>
+
                   {/* Col 2: ตัวเลือกหลัก */}
                   <Col md={8}>
                     <Radio.Group onChange={(e) => setValue(e.target.value)} value={value}>
@@ -1112,21 +1181,27 @@ export default function Home() {
                       </Row>
                     </Radio.Group>
                   </Col>
-                  <Divider type="vertical" />
+
+                  <Row>
+                    <Divider variant="dashed" type="vertical" style={{ height: '100%', borderColor: '#ccc' }} dashed></Divider>
+                  </Row>
+
                   {/* Col 3: เงื่อนไขเฉพาะเมื่อเลือก "online" */}
                   <Col>
                     {value === 'online' && (
                       <>
-                        <Radio.Group
-                          onChange={(e) => setConsultOption(e.target.value)}
-                          value={consultOption}
-                        >
-                          <Radio value="no">ไม่ปรึกษาแพทย์</Radio>
-                          <Radio value="yes">ปรึกษาแพทย์</Radio>
-                        </Radio.Group>
+                        <Space direction="vertical" size="middle">
+                          <Radio.Group
+                            onChange={(e) => setConsultOption(e.target.value)}
+                            value={consultOption}
+                          >
+                            <Row><Radio value="no">ไม่ปรึกษาแพทย์</Radio></Row>
+                            <Row><Radio value="yes">ปรึกษาแพทย์</Radio></Row>
+                          </Radio.Group>
+                        </Space>
 
                         {consultOption === 'yes' && (
-                          <div style={{ marginTop: 8 }}>
+                          <div style={{ marginTop: 4 /* หรือ 8 ตามต้องการ */ }}>
                             <Select
                               size="small"
                               placeholder="เลือกแพทย์"
@@ -1142,7 +1217,11 @@ export default function Home() {
                     )}
                   </Col>
                 </Row>
+                <Divider style={{ borderColor: '#7cb305' }}>Solid</Divider>
+
               </Card>
+
+              
 
             </Content>
           </Col>

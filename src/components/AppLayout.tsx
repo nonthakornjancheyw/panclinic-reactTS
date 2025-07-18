@@ -73,7 +73,8 @@ function AppLayout({ children }: Props) {
           onClick={({ key }) => navigate(key)}
           items={[
             { key: '/', icon: <WalletOutlined />, label: 'การเงิน' },
-            { key: '/about', icon: <InfoCircleOutlined />, label: 'เกี่ยวกับ' },
+            { key: '/about', icon: <InfoCircleOutlined />, label: 'เกี่ยวกับ' },           
+            { key: '/prodctAdmin', icon: <InfoCircleOutlined />, label: 'prodctAdmin' },
             { key: '/test', icon: <InfoCircleOutlined />, label: 'test' },
           ]}
         />
@@ -106,7 +107,7 @@ function AppLayout({ children }: Props) {
 
 
         <Content style={{
-          padding: '24px 16px',
+          padding: '8px 8px',
           overflowY: 'auto',
           height: 'calc(100vh - 64px)', // ลบความสูง header ออก (ถ้า Header สูง 64px)
         }}>

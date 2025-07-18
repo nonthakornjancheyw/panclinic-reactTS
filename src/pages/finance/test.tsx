@@ -1,103 +1,90 @@
-import React from 'react';
-import { AppstoreOutlined, MailOutlined, SettingOutlined } from '@ant-design/icons';
-import type { MenuProps } from 'antd';
-import { Menu } from 'antd';
+import React, { useState } from 'react';
+import { Select, Tag } from 'antd';
+import type { SelectProps } from 'antd';
+import { ReactSortable } from 'react-sortablejs';
+import type { CustomTagProps } from 'rc-select/lib/BaseSelect';
 
-type MenuItem = Required<MenuProps>['items'][number];
+interface ItemInterface {
+  id: string;
+  name: string;
+}
 
-const handleSubmenuClick = (key: string) => {
-  console.log('Submenu clicked:', key);
-};
+const rawOptions: SelectProps['options'] = [];
+for (let i = 10; i < 36; i++) {
+  const val = i.toString(36) + i;
+  rawOptions.push({ value: val, label: val });
+}
 
-const items: MenuItem[] = [
-  {
-    key: 'sub1',
-    icon: <MailOutlined />,
-    label: 'Navigation One',
-    children: [
-      {
-        key: '1-1',
-        label: 'Item 1',
-        type: 'group',
-        children: [
-          { key: '1', label: 'Option 1' },
-          { key: '2', label: 'Option 2' },
-        ],
-      },
-      {
-        key: '1-2',
-        label: 'Item 2',
-        type: 'group',
-        children: [
-          { key: '3', label: 'Option 3' },
-          { key: '4', label: 'Option 4' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'sub2',
-    icon: <AppstoreOutlined />,
-    label: (
-      <span
-        onClick={(e) => {
-          e.stopPropagation(); // ป้องกันให้ไม่เปิด/ปิด submenu อัตโนมัติ
-          handleSubmenuClick('sub2');
+const App: React.FC = () => {
+  const [selectedItems, setSelectedItems] = useState<ItemInterface[]>([]);
+
+  const handleChange = (values: (string | number)[]) => {
+    const newItems = values.map((val) => ({
+      id: String(val),
+      name: String(val),
+    }));
+    // อัพเดตลำดับตาม values ใหม่
+    setSelectedItems((prev) => {
+      const merged: ItemInterface[] = [];
+      values.forEach((val) => {
+        const exist = prev.find((x) => x.id === String(val));
+        if (exist) merged.push(exist);
+        else merged.push({ id: String(val), name: String(val) });
+      });
+      return merged;
+    });
+  };
+
+  // ซ่อน tag ที่ default แสดงใน Select เพราะเราแสดง tag แยกด้านล่างแทน
+  const tagRender = (props: CustomTagProps) => <></>;
+
+  return (
+    <div>
+      <Select
+        mode="tags" // ใช้ tags mode เพื่อให้พิมพ์เพิ่มได้
+        style={{ width: 400 }}
+        placeholder="Select or type and reorder"
+        onChange={handleChange}
+        value={selectedItems.map((item) => item.id)}
+        options={rawOptions}
+        tagRender={tagRender} // ซ่อน tag ปกติ
+      />
+
+      <ReactSortable<ItemInterface>
+        list={selectedItems}
+        setList={setSelectedItems}
+        animation={150}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 4,
+          marginTop: 8,
+          border: '1px solid #d9d9d9',
+          padding: 6,
+          borderRadius: 6,
+          minHeight: 40,
         }}
       >
-        Navigation Two
-      </span>
-    ),
-    children: [
-      { key: '5', label: 'Option 5' },
-      { key: '6', label: 'Option 6' },
-      {
-        key: 'sub3',
-        label: (
-          <span
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSubmenuClick('sub3');
+        {selectedItems.map((item) => (
+          <Tag
+            key={item.id}
+            closable
+            onClose={() => {
+              const next = selectedItems.filter((x) => x.id !== item.id);
+              setSelectedItems(next);
+            }}
+            style={{
+              cursor: 'move',
+              userSelect: 'none',
+              marginInlineEnd: 4,
             }}
           >
-            Submenu
-          </span>
-        ),
-        children: [
-          { key: '7', label: 'Option 7' },
-          { key: '8', label: 'Option 8' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'sub4',
-    label: (
-      <span
-        onClick={(e) => {
-          e.stopPropagation();
-          handleSubmenuClick('sub4');
-        }}
-      >
-        Navigation Three
-      </span>
-    ),
-    icon: <SettingOutlined />,
-    children: [
-      { key: '9', label: 'Option 9' },
-      { key: '10', label: 'Option 10' },
-      { key: '11', label: 'Option 11' },
-      { key: '12', label: 'Option 12' },
-    ],
-  },
-];
-
-const onClick: MenuProps['onClick'] = (e) => {
-  console.log('click', e);
+            {item.name}
+          </Tag>
+        ))}
+      </ReactSortable>
+    </div>
+  );
 };
-
-const App: React.FC = () => (
-  <Menu onClick={onClick} style={{ width: 256 }} mode="vertical" items={items} />
-);
 
 export default App;
