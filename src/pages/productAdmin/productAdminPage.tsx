@@ -1,4 +1,4 @@
-import React, { useRef,useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import FeatureToggle from './FeatureToggle'; 
 import {
   Table,
@@ -10,15 +10,15 @@ import {
   Col,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { CustomTagProps } from 'rc-select/lib/BaseSelect';
 
 import { SearchOutlined } from '@ant-design/icons';
-import type { InputRef, TableColumnsType, TableColumnType } from 'antd';
+import type { InputRef, TableColumnType } from 'antd';
 import { Button, Input, Space, } from 'antd';
 import type { FilterDropdownProps } from 'antd/es/table/interface';
-
+import * as productApi from './productApi';
 // import Highlighter from 'react-highlight-words';
 const { Content } = Layout;
+const { Option } = Select;
 
 const dayUseOptions = ['30 Day', '60 Day'].map((val) => ({
   label: val,
@@ -51,6 +51,8 @@ interface ItemInterface {
 }
 
 export default function ProductAdminTable() {
+  const [categories, setCategories] = useState<{rptCategoryID: string; rptCategoryName: string;}[]>([]);
+  const [valCategory, setValCategory] = useState<string | undefined>(undefined);
   const [data, setData] = useState<ProductRow[]>([
     {
       key: '1',
@@ -92,6 +94,17 @@ export default function ProductAdminTable() {
   const searchInput = useRef<InputRef>(null);
   const [searchText, setSearchText] = useState('');
   const [searchedColumn, setSearchedColumn] = useState('');
+
+  useEffect(() => {
+    productApi.GetRptCategory()
+      .then(data => {
+        setCategories(data as { rptCategoryID: string; rptCategoryName: string }[]);  
+      })
+      .catch(console.error);
+  }, []);
+
+
+
   // อัปเดตข้อมูล
   const handleChange = (
     key: string,
@@ -105,7 +118,7 @@ export default function ProductAdminTable() {
     );
   };
 
-  const handleSearch = (
+  const handleFilterName = (
     selectedKeys: string[],
     confirm: FilterDropdownProps['confirm'],
     dataIndex: DataIndex,
@@ -129,13 +142,13 @@ export default function ProductAdminTable() {
           placeholder={`Search ${dataIndex}`}
           value={selectedKeys[0]}
           onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-          onPressEnter={() => handleSearch(selectedKeys as string[], confirm, dataIndex)}
+          onPressEnter={() => handleFilterName(selectedKeys as string[], confirm, dataIndex)}
           style={{ marginBottom: 8, display: 'block' }}
         />
         <Space>
           <Button
             type="primary"
-            onClick={() => handleSearch(selectedKeys as string[], confirm, dataIndex)}
+            onClick={() => handleFilterName(selectedKeys as string[], confirm, dataIndex)}
             icon={<SearchOutlined />}
             size="small"
             style={{ width: 90 }}
@@ -169,8 +182,17 @@ export default function ProductAdminTable() {
     },
     render: (text) => <span>{text}</span>, // ❌ ไม่ใช้ Highlighter แล้ว
   });
-
   
+  const handleSearch = async () => {
+    try {
+      const data = await productApi.GetProduct();
+      console.log('Data from GetProduct:', data);
+      // ทำอะไรกับ data ต่อ เช่น setState, แสดงผล ฯลฯ
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const columns: ColumnsType<ProductRow> = [
     {
       title: 'Name',
@@ -259,13 +281,37 @@ export default function ProductAdminTable() {
           
           <Row gutter={[8, 0]} style={{ marginBottom: 8 }}>
             <Col>
-              <Select mode="tags" size="small" style={{ width: 120 }} />
+              <Select
+                size="small"
+                style={{ width: 120 }}
+                placeholder="เลือกหมวดหมู่"
+                value={valCategory}
+                onChange={(val) => setValCategory(val)}
+                allowClear
+              >
+                {categories.map(function (cat) {
+                  return (
+                    <Option key={cat.rptCategoryID} value={cat.rptCategoryID}>
+                      {cat.rptCategoryName}
+                    </Option>
+                  );
+                })}
+              </Select>
             </Col>
             <Col>
               <Select mode="tags" size="small" style={{ width: 120 }} />
             </Col>
             <Col>
               <Select mode="tags" size="small" style={{ width: 120 }} />
+            </Col>
+            <Col>
+              <Button
+                icon={<SearchOutlined />}
+                onClick={handleSearch}
+                type="primary"
+              >
+                ค้นหา
+              </Button>
             </Col>
           </Row>
 
@@ -277,7 +323,6 @@ export default function ProductAdminTable() {
               pagination={false}
               rowKey="key"
               scroll={{ y: 'calc(100vh - 200px)' }}
-              style={{ fontSize: 12, padding: 0, }}
             />
           </Row>
         </Card>
