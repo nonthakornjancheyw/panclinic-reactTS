@@ -7,6 +7,7 @@ import {
   MenuFoldOutlined,
   DownOutlined,
   UserOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
@@ -45,7 +46,12 @@ function AppLayout({ children }: Props) {
   
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} trigger={null}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        trigger={null}
+        style={{ backgroundColor: '#30246c' }}
+      >
         <div
           style={{
             height: 64,
@@ -71,23 +77,43 @@ function AppLayout({ children }: Props) {
           mode="inline"
           selectedKeys={[location.pathname]}
           onClick={({ key }) => navigate(key)}
+          style={{ backgroundColor: '#30246c' }}
           items={[
-            { key: '/', icon: <WalletOutlined />, label: 'การเงิน' },
-            { key: '/about', icon: <InfoCircleOutlined />, label: 'เกี่ยวกับ' },           
-            { key: '/prodctAdmin', icon: <InfoCircleOutlined />, label: 'prodctAdmin' },
-            { key: '/test', icon: <InfoCircleOutlined />, label: 'test' },
+            {
+              key: '/',
+              icon: <WalletOutlined style={{ color: '#fff' }} />,
+              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>การเงิน</span>,
+            },
+            {
+              key: '/about',
+              icon: <InfoCircleOutlined style={{ color: '#fff' }} />,
+              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>เกี่ยวกับ</span>,
+            },
+            {
+              key: '/prodctAdmin',
+              icon: <AppstoreOutlined style={{ color: '#fff' }} />,
+              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>บริการ</span>,
+            },
+            {
+              key: '/test',
+              icon: <InfoCircleOutlined style={{ color: '#fff' }} />,
+              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>test</span>,
+            },
           ]}
         />
+
       </Sider>
 
+
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 16px', zIndex: 1, position: 'sticky', top: 0 }}>
+        <Header style={{ background: '#ffffffff', padding: '0 16px', zIndex: 999, 
+          position: 'sticky', top: 0, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)', }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 64 }}>
             <img src={logo} alt="Panclinic Logo" style={{ height: 40 }} />
 
             <Dropdown menu={{ items: userMenuItems, onClick: onUserMenuClick }} trigger={['click']}>
               <a onClick={(e) => e.preventDefault()} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                <Space style={{ color: '#004080' }}>
+                <Space style={{ color: '#30246c' }}>
                   {userInfo.employeeId}: {userInfo.name} [{userInfo.branch}] <UserOutlined />
                   <DownOutlined />
                 </Space>
@@ -95,17 +121,9 @@ function AppLayout({ children }: Props) {
             </Dropdown>
           </div>
 
-          {/* เส้นขั้นนี้อยู่ล่าง header และจะติดอยู่ตลอด */}
-          <div style={{
-            height: 4,
-            width: '100%',
-            backgroundColor: '#004080',
-            marginTop: 0,
-          }} />
+          
         </Header>
-
-
-
+   
         <Content style={{
           padding: '8px 8px',
           overflowY: 'auto',

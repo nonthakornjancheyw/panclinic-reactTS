@@ -10,7 +10,7 @@ import { PlusOutlined, MinusOutlined, DownOutlined, UpOutlined } from '@ant-desi
 import { renderCouponOptions, renderActivityOptions } from '../finance/selectOptions';
 import { v4 as uuidv4 } from 'uuid';
 import { useStyle } from './styles.ts';
-import './scss.css';
+import './style.css';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';

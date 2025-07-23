@@ -1,21 +1,19 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { debounce } from 'lodash';
 import FeatureToggle from './FeatureToggle'; 
-import {
-  Table,
-  Select,
-  Tag,
-  Row,
-  Layout,
-  Card,
-  Col,
+import { 
+  Table, Select, Spin, Row, Layout, Card, 
+  Col, Pagination, Button, Input, Space,
+  message, Typography, Tag
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-
-import { SearchOutlined } from '@ant-design/icons';
+const { Text } = Typography;
 import type { InputRef, TableColumnType } from 'antd';
-import { Button, Input, Space, } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { SearchOutlined, SaveOutlined, LineOutlined } from '@ant-design/icons';
 import type { FilterDropdownProps } from 'antd/es/table/interface';
 import * as productApi from './productApi';
+import './style.css';
+
 // import Highlighter from 'react-highlight-words';
 const { Content } = Layout;
 const { Option } = Select;
@@ -44,66 +42,204 @@ interface ProductRow {
   time: string;
 }
 
-// สำหรับ react-sortablejs ต้องมี object interface แบบนี้
-interface ItemInterface {
-  id: string;
-  value: string;
+interface Brand {
+  CategoryID: string;
+  CategoryName: string;
+  BrandID: string;
+  BrandName: string;
+  CategoryOrder: number;
 }
 
 export default function ProductAdminTable() {
-  const [categories, setCategories] = useState<{rptCategoryID: string; rptCategoryName: string;}[]>([]);
-  const [valCategory, setValCategory] = useState<string | undefined>(undefined);
-  const [data, setData] = useState<ProductRow[]>([
-    {
-      key: '1',
-      name: 'VANP 10 gm.',
-      features: ['ชุดเซลล์ผิวเก่า', 'คิวเท็นผิวกระชับ', 'ลดรอยดำ'],
-      dayUse: '30 Day',
-      frequency: '1 Week',
-      productGroup: ['AHA'],
-      time: '',
-    },
-    {
-      key: '2',
-      name: 'Anti SKL 10 gm.',
-      features: ['กระชับ', 'ตึงเนื้อ'],
-      dayUse: '60 Day',
-      frequency: '4 Week',
-      productGroup: ['Sun Screen'],
-      time: '',
-    },
-    {
-      key: '3',
-      name: 'PD Cream 10 gm.',
-      features: [],
-      dayUse: '-',
-      frequency: '-',
-      productGroup: [],
-      time: '',
-    },
-    {
-      key: '4',
-      name: 'Oxygen Tx.',
-      features: ['เปล่งเปลั่ง'],
-      dayUse: '-',
-      frequency: '8 Week',
-      productGroup: ['Anti Aging'],
-      time: '',
-    },
-  ]);
+  const [spinning, setSpinning] = useState<boolean>(false); // loading 
+  const [currentPage, setCurrentPage] = useState(1); //หน้า
+  const PAGE_SIZE = 50;
+  const [categoriesItem, setCategoriesItem] = useState<{rptCategoryID: string; rptCategoryName: string;}[]>([]);//เก็บประเภทcategory
+
+  const [allBrands, setAllBrands] = useState<Brand[]>([]); //เก็บbrandทั้งหมด
+  const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]); // เอาไว้ bind Select
+  
+  const [search, setSearch] = useState({
+    nameProduct: '',
+    categoryID: undefined as string | undefined,
+    brandID: [] as string[],
+    statusTag: undefined as string | undefined,
+  });
+
+  const [data, setData] = useState<ProductRow[]>([]);
+  const [originalData, setOriginalData] = useState<ProductRow[]>([]);
+
+
   const searchInput = useRef<InputRef>(null);
   const [searchText, setSearchText] = useState('');
   const [searchedColumn, setSearchedColumn] = useState('');
 
+  const fetchData = async () => {
+    try {
+      const data = await productApi.GetFetch() as {
+        category: { rptCategoryID: string; rptCategoryName: string }[];
+        brand: { CategoryID: string; CategoryName: string; BrandID: string; BrandName: string; CategoryOrder: number }[];
+      };
+
+      // เก็บประเภท
+      const allItem = { rptCategoryID: 'ALL', rptCategoryName: 'ทั้งหมด' };
+      const newData = [allItem, ...data.category];
+      setCategoriesItem(newData);
+
+      // แปลงชื่อ CategoryOrder → rptCategoryOrder (ถ้าต้องการ)
+      const transformedBrands = data.brand.map(item => ({
+        ...item,
+        rptCategoryOrder: item.CategoryOrder,
+      }));
+
+      setAllBrands(transformedBrands);
+      setSearch(prev => ({ ...prev, categoryID: 'ALL' }));
+      setFilteredBrands(transformedBrands); // เริ่มต้นแสดงแบรนด์ทั้งหมด
+
+      handleSearch(1);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+
   useEffect(() => {
-    productApi.GetRptCategory()
-      .then(data => {
-        setCategories(data as { rptCategoryID: string; rptCategoryName: string }[]);  
-      })
-      .catch(console.error);
+    fetchData();
   }, []);
 
+  useEffect(() => {
+    if (search.categoryID === 'ALL') {
+      setFilteredBrands(allBrands); // หรือจะใส่ทุกแบรนด์ก็ได้
+    } else {
+      const result = allBrands.filter(function (b) {
+        return b.CategoryID === search.categoryID;
+      });
+      setFilteredBrands(result);
+    }
+    // เคลียร์แบรนด์ที่เลือกอยู่
+    setSearch({ ...search, brandID: [] });
+  }, [search.categoryID]);
 
+
+  const handleSearch = async (page = 1) => {
+    try {
+      console.log('handleSearch')
+      console.log('brandID=',search.brandID)
+      setSpinning(true)
+      const selectedCategoryID = search.categoryID || 'ALL';
+      const response: any = await productApi.GetProduct( search.nameProduct, selectedCategoryID, search.brandID, search.statusTag, page, PAGE_SIZE);
+      const mappedData: ProductRow[] = response.map((item: any) => {
+        const tags: string[] = item.TagDetail ? item.TagDetail.split(',').map((tag: string) => tag.trim()) : [];
+        const priorities: number[] = item.TagPriority ? item.TagPriority.split(',').map((p: string) => parseInt(p.trim(), 10)) : [];
+
+        const tagWithPriority: { tag: string; priority: number }[] = tags.map((tag: string, idx: number) => ({
+          tag,
+          priority: priorities[idx] || 999,
+        }));
+
+        tagWithPriority.sort((a, b) => a.priority - b.priority);
+
+        return {
+          key: item.ProductID,
+          name: item.Name,
+          features: tagWithPriority.map((t) => t.tag),
+          dayUse: '',
+          frequency: '',
+          productGroup: [],
+          time: '',
+        };
+      });
+
+      setData(mappedData);
+      setOriginalData(JSON.parse(JSON.stringify(mappedData)));
+    } catch (error) {
+      console.error(error);
+    }
+    finally {
+      setSpinning(false);
+    }
+  };
+
+  const handleSave = async () => {
+  try {
+    const changedItems = data
+      .map(function (currentItem) {
+        const originalItem = originalData.find(function (o) {
+          return o.key === currentItem.key;
+        });
+
+        if (!originalItem) return null;
+
+        const originalTags = originalItem.features || [];
+        const currentTags = currentItem.features || [];
+        const originalSet = new Set(originalTags);
+
+        // ตรวจสอบ tag ปัจจุบันทั้งหมด เรียงตามลำดับจริง
+        const tagsWithStatus = currentTags.map(function (tag, index) {
+          const newPriority = index + 1;
+          const oldIndex = originalTags.indexOf(tag);
+          const oldPriority = oldIndex + 1;
+
+          if (!originalSet.has(tag)) {
+            return {
+              tagName: tag,
+              tagStatus: 'Add',
+              priority: newPriority,
+            };
+          }
+
+          return {
+            tagName: tag,
+            tagStatus: oldPriority === newPriority ? 'Unchanged' : 'Reorder',
+            priority: newPriority,
+          };
+        });
+
+        // ตรวจสอบ tag ที่หายไปจากรายการใหม่ (ลบ)
+        const removedTags = originalTags
+          .filter(function (tag) {
+            return !currentTags.includes(tag);
+          })
+          .map(function (tag) {
+            return {
+              tagName: tag,
+              tagStatus: 'Remove',
+              priority: 0,
+            };
+          });
+
+        const allChanges = [...tagsWithStatus, ...removedTags];
+
+        // ถือว่าเปลี่ยน ถ้าอย่างน้อย 1 tag ไม่ใช่ 'Unchanged' หรือมี tag ที่หายไป
+        const isChanged = allChanges.some(function (t) {
+          return t.tagStatus !== 'Unchanged';
+        });
+
+        if (isChanged) {
+          return {
+            ...currentItem,
+            features: allChanges,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    console.log('รายการที่เปลี่ยนแปลงทั้งหมด:', changedItems);
+    message.success('บันทึกเรียบร้อยแล้ว');
+  } catch (error) {
+    console.error('เกิดข้อผิดพลาดขณะบันทึก:', error);
+    message.error('บันทึกล้มเหลว');
+  }
+};
+
+
+
+
+  const handleNameChange = debounce((val) => {
+    setSearch(prev => ({ ...prev, nameProduct: val }));
+  }, 300);
 
   // อัปเดตข้อมูล
   const handleChange = (
@@ -135,7 +271,7 @@ export default function ProductAdminTable() {
 
   type DataIndex = keyof ProductRow;
   const getColumnSearchProps = (dataIndex: DataIndex): TableColumnType<ProductRow> => ({
-    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters, close }) => (
+    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
       <div style={{ padding: 8 }} onKeyDown={(e) => e.stopPropagation()}>
         <Input
           ref={searchInput}
@@ -182,49 +318,84 @@ export default function ProductAdminTable() {
     },
     render: (text) => <span>{text}</span>, // ❌ ไม่ใช้ Highlighter แล้ว
   });
-  
-  const handleSearch = async () => {
-    try {
-      const data = await productApi.GetProduct();
-      console.log('Data from GetProduct:', data);
-      // ทำอะไรกับ data ต่อ เช่น setState, แสดงผล ฯลฯ
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   const columns: ColumnsType<ProductRow> = [
     {
-      title: 'Name',
+      title: 'No.',
+      dataIndex: 'index',
+      width: 70,
+      align: 'center',
+      render: (_, __, index) => index + 1,
+    },
+    {
+      title: 'Product Name',
       dataIndex: 'name',
-      width: 500,
+      width: 450,
       ...getColumnSearchProps('name'),
-      sorter: (a, b) => a.name.localeCompare(b.name),     
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      render: function (text) {
+        return (
+          <span className="product-name-cell" style={{color: '#424242ff'}}> 
+            {text}
+          </span>
+        );
+      }
     },
     {
       title: 'ProductFeature',
       dataIndex: 'features',
-      render: (features: string[], record) => (
-        <FeatureToggle
-          features={features}
-          recordKey={record.key}
-          onChange={(key, newFeatures) => handleChange(key, 'features', newFeatures)}
-        />
-      ),
+      width: 400,
+      sorter: (a, b) => b.features.length - a.features.length, // เรียงจากมากไปน้อย (desc)
+      render: (features: string[] | undefined, record) => {
+        if (!features || features.length === 0) {
+          return (
+            <span
+              style={{
+                color: '#8D8D8D',
+                display: 'inline-block',
+                width: '8px',      // กำหนดความยาวขีด
+                borderBottom: '1px solid #8D8D8D', // แทนที่ underscore ด้วยเส้นขีดใต้
+                verticalAlign: 'middle',  // จัดให้อยู่กลางแนวตั้ง
+                lineHeight: 'normal',     // ไม่ชิดขอบล่าง
+              }}
+            >
+              {/* ไม่ต้องใส่ข้อความ */}
+            </span>
+          );
+        }
+        return (
+          <FeatureToggle
+            features={features}
+            recordKey={record.key}
+            onChange={(key, newFeatures) => handleChange(key, 'features', newFeatures)}
+          />
+        );
+      },
     },
     {
       title: 'DayUse',
       dataIndex: 'dayUse',
       width: 160,
+      align: 'center',
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: (value, record) => (
-        <Select
-          size="small"
-          style={{ width: '100%' }}
-          value={value}
-          options={dayUseOptions}
-          onChange={(val) => handleChange(record.key, 'dayUse', val)}
-        />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Select
+            size="small"
+            style={{ width: '100%' }}
+            value={value}
+            options={dayUseOptions}
+            onChange={(val) => handleChange(record.key, 'dayUse', val)}
+            styles={{
+              popup: {
+                root: {
+                  textAlign: 'center',
+                },
+              },
+            }}
+          />
+
+        </div>
       ),
     },
     {
@@ -275,57 +446,137 @@ export default function ProductAdminTable() {
   ];
 
   return (
-    <Layout>
+    <Layout style={{ padding: 10 }}>
       <Content>
-        <Card style={{ height: 'calc(100vh - 80px)', overflow: 'hidden' }}>
-          
+        <Card style={{ height: 'calc(95vh - 75px)', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)', }}>         
           <Row gutter={[8, 0]} style={{ marginBottom: 8 }}>
-            <Col>
+            <Col style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text strong>ชื่อสินค้า</Text>
+              <Input
+                placeholder="ค้นหาชื่อสินค้า"
+                defaultValue={search.nameProduct}
+                onChange={(e) => handleNameChange(e.target.value)}
+                style={{ width: 200 }}
+                allowClear
+              />
+            </Col>
+            
+            <Col style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text strong>ประเภท</Text>
               <Select
-                size="small"
                 style={{ width: 120 }}
-                placeholder="เลือกหมวดหมู่"
-                value={valCategory}
-                onChange={(val) => setValCategory(val)}
+                value={search.categoryID}
+                onChange={(val) => setSearch(prev => ({ ...prev, categoryID: val }))}
                 allowClear
               >
-                {categories.map(function (cat) {
+                {categoriesItem.map((cat) => (
+                  <Option key={cat.rptCategoryID} value={cat.rptCategoryID}>
+                    {cat.rptCategoryName}
+                  </Option>
+                ))}
+              </Select>
+            </Col>
+
+            <Col style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text strong>ยี่ห้อ</Text>
+              <Select
+                mode="tags"
+                style={{ width: 500 }}
+                value={search.brandID}
+                onChange={function (val) {
+                  setSearch(function (prev) {
+                    return { ...prev, brandID: val };
+                  });
+                }}
+                placeholder="เลือกยี่ห้อ"
+                virtual
+              >
+                {filteredBrands.map(function (brand) {
                   return (
-                    <Option key={cat.rptCategoryID} value={cat.rptCategoryID}>
-                      {cat.rptCategoryName}
+                    <Option key={brand.BrandID} value={brand.BrandID}>
+                      {brand.BrandName}
                     </Option>
                   );
                 })}
               </Select>
             </Col>
-            <Col>
-              <Select mode="tags" size="small" style={{ width: 120 }} />
+
+            <Col style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text strong>สถานะ Tag</Text>
+              <Select
+                style={{ width: 120 }}
+                value={search.statusTag}
+                defaultValue={'ALL'}
+                placeholder="เลือก tag"
+                onChange={function (val) {
+                  setSearch(function (prev) {
+                    return { ...prev, statusTag: val };
+                  });
+                }}
+              >
+                <Option value="ALL">ทั้งหมด</Option>
+                <Option value="haveTag">มี Tag</Option>
+                <Option value="noTag">ยังไม่มี Tag</Option>
+              </Select>
             </Col>
-            <Col>
-              <Select mode="tags" size="small" style={{ width: 120 }} />
-            </Col>
-            <Col>
+
+            <Col style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <Button
                 icon={<SearchOutlined />}
-                onClick={handleSearch}
+                onClick={() => {
+                  setCurrentPage(1);
+                  handleSearch(1);
+                }}
                 type="primary"
               >
                 ค้นหา
               </Button>
             </Col>
+
+            <Col flex="auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+              <Button 
+                color="cyan" 
+                variant="solid"
+                icon={<SaveOutlined />}
+                onClick={handleSave}
+              >
+                บันทึก
+              </Button>
+            </Col>
           </Row>
+
+
 
           <Row gutter={[8, 0]}>
             <Table
               size="small"
               columns={columns}
               dataSource={data}
-              pagination={false}
               rowKey="key"
-              scroll={{ y: 'calc(100vh - 200px)' }}
+              pagination={false}
+              scroll={{ y: 120 * 5 }}
+              style={{ marginBottom: 10 }}
+              className="custom-small-table" 
             />
           </Row>
+          <Pagination
+            align="end"
+            current={currentPage}
+            pageSize={50}               // หน้า 1 มี 150 รายการ
+            total={50 * 6}              // บังคับให้มี 6 หน้า (ไม่สนว่า backend มีกี่รายการ)
+            showSizeChanger={false}
+            onChange={(page) => {
+              setCurrentPage(page);     // บันทึกว่าอยู่หน้าที่เท่าไหร่
+              handleSearch(page);       // ไปค้นหาใหม่ โดยส่ง page ไป
+            }}
+          />
         </Card>
+        {/* <Spin spinning={spinning} fullscreen /> */}
+        {spinning && (
+          <div>
+            <Spin fullscreen />
+          </div>
+        )}
       </Content>
     </Layout>
   );

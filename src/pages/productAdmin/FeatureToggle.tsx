@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tag, Select, Row, Col, Tooltip } from 'antd';
 import { ReactSortable } from 'react-sortablejs';
-import { SyncOutlined, CheckOutlined } from '@ant-design/icons';
+import { SwapOutlined, CheckOutlined } from '@ant-design/icons';
 
 interface ItemInterface {
   id: string;
@@ -24,8 +24,14 @@ const tagColors: Record<string, string> = {
   'ให้ความชุ่มชื้น': 'green',
   'กระชับ': 'pink',
   'ตึงเนื้อ': 'purple',
-  'เปล่งเปลั่ง': 'cyan',
+  'เปล่งปลั่ง': 'cyan',
+  'ลดริ้วรอย':'#108ee9',
+  'ให้อาหารผิว': '#f50',
+  'เติมออกซิเจนให้ผิว': '#ff7dd4ff',
+  'เพิ่มคอลลาเจน': '#009751ff',
+
 };
+// #f50
 // magenta
 // red
 // volcano
@@ -203,13 +209,13 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
           )}
         </Col>
         <Col style={{ width: 32, textAlign: 'center' }}>
-          <Tooltip title={isDragMode ? 'เลิกลาก' : 'ลากเรียง'}>
-            <SyncOutlined
+          <Tooltip title={isDragMode ? 'เลิกจัดลำดับ' : 'จัดลำดับ'}>
+            <SwapOutlined
               onClick={() => setIsDragMode(!isDragMode)}
               style={{
                 fontSize: 18,
                 cursor: 'pointer',
-                color: isDragMode ? 'blue' : undefined,
+                color: isDragMode ? '#bc00e2ff' : '#919191ff',
               }}
             />
           </Tooltip>
