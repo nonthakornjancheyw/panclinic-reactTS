@@ -12,7 +12,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import logo from '../assets/logo-txtBlue.png';
-
+import './component_style.css';
 const { Header, Sider, Content } = Layout;
 
 interface Props {
@@ -78,6 +78,7 @@ function AppLayout({ children }: Props) {
           selectedKeys={[location.pathname]}
           onClick={({ key }) => navigate(key)}
           style={{ backgroundColor: '#30246c' }}
+          rootClassName="custom-menu"
           items={[
             {
               key: '/',

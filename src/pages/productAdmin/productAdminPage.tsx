@@ -18,19 +18,38 @@ import './style.css';
 const { Content } = Layout;
 const { Option } = Select;
 
-const dayUseOptions = ['30 Day', '60 Day'].map((val) => ({
-  label: val,
-  value: val,
-}));
+const dayUseOptions = [
+  { label: '-', value: '', color: '#fff' }, // ว่างจริง (ไม่มี label)
+  { label: '30 Day', value: '30 Day', color: '#ff85c0' },
+  { label: '60 Day', value: '60 Day', color: '#9254de' },
+];
 
-const frequencyOptions = ['-', '1 Week', '2 Week', '3 Week', '4 Week', '8 Week', '12 Week', '16 Week', '32 Week', '52 Week'].map(
-  (val) => ({ label: val, value: val })
-);
 
-const productGroupOptions = ['AHA', 'Sun Screen', 'Anti Aging'].map((val) => ({
-  label: val,
-  value: val,
-}));
+
+const frequencyOptions = [
+  { label: '-', value: '', color: '#fff' }, // placeholder
+  { label: '1 Week', value: '1 Week', color: '#02bcd4' },
+  { label: '2 Week', value: '2 Week', color: '#ff4081' },
+  { label: '4 Week', value: '4 Week', color: '#ea80fc' },
+  { label: '5 Week', value: '5 Week', color: '#7c4dff' },
+  { label: '16 Week', value: '16 Week', color: '#f900ea' },
+  { label: '32 Week', value: '32 Week', color: '#af7e2e' },
+  { label: '52 Week', value: '52 Week', color: '#9b59b6' },
+];
+
+
+const productGroupOptions = [
+  { label: 'AHA', value: 'AHA', color: '#69c0ff' },
+  { label: 'Sun Screen', value: 'Sun Screen', color: '#ff9c6e' },
+  { label: 'Anti Aging', value: 'Anti Aging', color: '#b37feb' },
+];
+
+const timeOptions = [
+  { label: 'Time1', value: 'Time1', color: '#69c0ff' },
+  { label: 'Time2', value: 'Time2', color: '#ff9c6e' },
+  { label: 'Time3', value: 'Time3', color: '#b37feb' },
+];
+
 
 interface ProductRow {
   key: string;
@@ -49,6 +68,74 @@ interface Brand {
   BrandName: string;
   CategoryOrder: number;
 }
+
+type Option = { label: string; value: string; color?: string };
+const renderSelectCell = <Field extends keyof ProductRow>(
+  value: ProductRow[Field],
+  record: ProductRow,
+  options: Option[],
+  field: Field,
+  handleChange: (key: string, field: Field, value: ProductRow[Field]) => void
+) => {
+  // จัดการกรณี array (เช่น productGroup: string[])
+  const currentValue =
+    Array.isArray(value) && value.length > 0 ? value[0] : (value as string) || '';
+
+  const isEmpty = !currentValue || currentValue === '';
+
+  return (
+    <Select
+      size="small"
+      style={{
+        width: '100%',
+        backgroundColor:
+          options.find((o) => o.value === currentValue)?.color || '#fff',
+        color: '#fff',
+        borderRadius: 4,
+        textAlign: isEmpty ? 'left' : 'center',
+      }}
+      value={isEmpty ? undefined : currentValue}
+      placeholder={
+        <span
+          style={{
+            color: '#8D8D8D',
+            display: 'inline-block',
+            width: '8px',
+            borderBottom: '1px solid #8D8D8D',
+            verticalAlign: 'middle',
+            lineHeight: 'normal',
+            textAlign: 'left',
+          }}
+        />
+      }
+      options={
+        (isEmpty ? options.filter((opt) => opt.value !== '') : options).map((opt) => ({
+          value: opt.value,
+          label: (
+            <div
+              style={{
+                backgroundColor: opt.color || '#fff',
+                color: opt.value ? '#fff' : '#8D8D8D',
+                textAlign: 'center',
+                borderRadius: 4,
+                padding: '2px 8px',
+              }}
+            >
+              {opt.label}
+            </div>
+          ),
+        }))
+      }
+      onChange={(val) => {
+        // ถ้า field เป็น productGroup (string[]) ต้องเก็บเป็น array
+        const newValue = (Array.isArray(value) ? [val] : val) as ProductRow[Field];
+        handleChange(record.key, field, newValue);
+      }}
+      suffixIcon={null} // ซ่อน icon dropdown
+    />
+  );
+};
+
 
 export default function ProductAdminTable() {
   const [spinning, setSpinning] = useState<boolean>(false); // loading 
@@ -71,8 +158,7 @@ export default function ProductAdminTable() {
 
 
   const searchInput = useRef<InputRef>(null);
-  const [searchText, setSearchText] = useState('');
-  const [searchedColumn, setSearchedColumn] = useState('');
+
 
   const fetchData = async () => {
     try {
@@ -254,19 +340,10 @@ export default function ProductAdminTable() {
     );
   };
 
-  const handleFilterName = (
-    selectedKeys: string[],
-    confirm: FilterDropdownProps['confirm'],
-    dataIndex: DataIndex,
-  ) => {
-    confirm();
-    setSearchText(selectedKeys[0]);
-    setSearchedColumn(dataIndex);
-  };
+  const handleFilterName = (confirm: FilterDropdownProps['confirm'],) => { confirm(); };
 
   const handleReset = (clearFilters: () => void) => {
     clearFilters();
-    setSearchText('');
   };
 
   type DataIndex = keyof ProductRow;
@@ -278,13 +355,13 @@ export default function ProductAdminTable() {
           placeholder={`Search ${dataIndex}`}
           value={selectedKeys[0]}
           onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-          onPressEnter={() => handleFilterName(selectedKeys as string[], confirm, dataIndex)}
+          onPressEnter={() => handleFilterName(confirm)}
           style={{ marginBottom: 8, display: 'block' }}
         />
         <Space>
           <Button
             type="primary"
-            onClick={() => handleFilterName(selectedKeys as string[], confirm, dataIndex)}
+            onClick={() => handleFilterName(confirm)}
             icon={<SearchOutlined />}
             size="small"
             style={{ width: 90 }}
@@ -345,103 +422,52 @@ export default function ProductAdminTable() {
       title: 'ProductFeature',
       dataIndex: 'features',
       width: 400,
-      sorter: (a, b) => b.features.length - a.features.length, // เรียงจากมากไปน้อย (desc)
-      render: (features: string[] | undefined, record) => {
-        if (!features || features.length === 0) {
-          return (
-            <span
-              style={{
-                color: '#8D8D8D',
-                display: 'inline-block',
-                width: '8px',      // กำหนดความยาวขีด
-                borderBottom: '1px solid #8D8D8D', // แทนที่ underscore ด้วยเส้นขีดใต้
-                verticalAlign: 'middle',  // จัดให้อยู่กลางแนวตั้ง
-                lineHeight: 'normal',     // ไม่ชิดขอบล่าง
-              }}
-            >
-              {/* ไม่ต้องใส่ข้อความ */}
-            </span>
-          );
-        }
-        return (
-          <FeatureToggle
-            features={features}
-            recordKey={record.key}
-            onChange={(key, newFeatures) => handleChange(key, 'features', newFeatures)}
-          />
-        );
-      },
+      sorter: (a, b) => b.features.length - a.features.length,
+      render: (features: string[] | undefined, record) => (
+        <FeatureToggle
+          features={features || []}
+          recordKey={record.key}
+          onChange={(key, newFeatures) => {
+            setData(prev => prev.map(item => (item.key === key ? { ...item, features: newFeatures } : item)));
+          }}
+        />
+      ),
     },
     {
       title: 'DayUse',
       dataIndex: 'dayUse',
       width: 160,
-      align: 'center',
+      className: "custom-select-ant",
       sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (value, record) => (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <Select
-            size="small"
-            style={{ width: '100%' }}
-            value={value}
-            options={dayUseOptions}
-            onChange={(val) => handleChange(record.key, 'dayUse', val)}
-            styles={{
-              popup: {
-                root: {
-                  textAlign: 'center',
-                },
-              },
-            }}
-          />
-
-        </div>
-      ),
+      render: (value, record) =>
+        renderSelectCell('' + value, record, dayUseOptions, 'dayUse', handleChange),
     },
     {
       title: 'Frequency',
       dataIndex: 'frequency',
       width: 150,
+      className: "custom-select-ant",
       sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (value, record) => (
-        <Select
-          size="small"
-          style={{ width: '100%' }}
-          value={value}
-          options={frequencyOptions}
-          onChange={(val) => handleChange(record.key, 'frequency', val)}
-        />
-      ),
+      render: (value, record) =>
+        renderSelectCell('' + value, record, frequencyOptions, 'frequency', handleChange),
     },
     {
       title: 'ProductGroup',
       dataIndex: 'productGroup',
       width: 200,
+      className: "custom-select-ant",
       sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (value, record) => (
-        <Select
-          size="small"
-          style={{ width: '100%' }}
-          value={value[0] || undefined}
-          onChange={(val) => handleChange(record.key, 'productGroup', [val])}
-          options={productGroupOptions}
-        />
-      ),
+      render: (value, record) =>
+        renderSelectCell(value, record, productGroupOptions, 'productGroup', handleChange),
     },
     {
       title: 'Time',
       dataIndex: 'time',
       width: 150,
+      className: "custom-select-ant",
       sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (value, record) => (
-        <Select
-          size="small"
-          style={{ width: '100%' }}
-          value={value}
-          options={frequencyOptions}
-          onChange={(val) => handleChange(record.key, 'time', val)}
-        />
-      ),
+      render: (value, record) =>
+        renderSelectCell(value, record, timeOptions, 'time', handleChange),
     },
   ];
 

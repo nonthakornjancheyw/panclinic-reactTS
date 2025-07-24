@@ -1,7 +1,7 @@
 import React from 'react';
-import { Tag, Select, Row, Col, Tooltip } from 'antd';
+import { Tag } from 'antd';
 import { ReactSortable } from 'react-sortablejs';
-import { SwapOutlined, CheckOutlined } from '@ant-design/icons';
+import { CheckOutlined } from '@ant-design/icons'; // 👈 ต้อง import ด้วย
 
 interface ItemInterface {
   id: string;
@@ -25,116 +25,154 @@ const tagColors: Record<string, string> = {
   'กระชับ': 'pink',
   'ตึงเนื้อ': 'purple',
   'เปล่งปลั่ง': 'cyan',
-  'ลดริ้วรอย':'#108ee9',
+  'ลดริ้วรอย': '#108ee9',
   'ให้อาหารผิว': '#f50',
   'เติมออกซิเจนให้ผิว': '#ff7dd4ff',
   'เพิ่มคอลลาเจน': '#009751ff',
-
 };
-// #f50
-// magenta
-// red
-// volcano
-// orange
-// gold
-// lime
-// green
-// cyan
-// blue
-// geekblue
-// purple
-
-const initialOptions = Object.keys(tagColors).map((key) => ({
-  label: key,
-  value: key,
-}));
-
-// ... [ไม่เปลี่ยนส่วน import และส่วนบนของไฟล์] ...
 
 const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onChange }) => {
+  // เปลี่ยน allOptions ให้เป็น state เพื่อเพิ่มรายการใหม่ได้
+  const [allOptions, setAllOptions] = React.useState<string[]>(Object.keys(tagColors));
+  
+  const [open, setOpen] = React.useState(false);
+  const [dragList, setDragList] = React.useState<ItemInterface[]>(
+    features.map((v) => ({ id: v, value: v }))
+  );
   const [searchValue, setSearchValue] = React.useState('');
-  const [options, setOptions] = React.useState(initialOptions);
 
-  const toItemInterfaceArray = (arr: string[]): ItemInterface[] =>
-    arr.map((v) => ({ id: v, value: v }));
-
-  const fromItemInterfaceArray = (arr: ItemInterface[]): string[] =>
-    arr.map((v) => v.value);
-
-  const [isDragMode, setIsDragMode] = React.useState(false);
-  const [dragList, setDragList] = React.useState<ItemInterface[]>(toItemInterfaceArray(features));
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    setDragList(toItemInterfaceArray(features));
-  }, [features]);
-
-  const onSort = (newList: ItemInterface[]) => {
-    setDragList(newList);
-    onChange(recordKey, fromItemInterfaceArray(newList));
-  };
-
-  const onSelectChange = (val: string[]) => {
-    const newTags = val.filter((v) => !options.some((opt) => opt.value === v));
-    if (newTags.length > 0) {
-      const added = newTags.map((v) => ({ label: v, value: v }));
-      setOptions((prev) => [...prev, ...added]);
+    if (open) {
+      setDragList(features.map((v) => ({ id: v, value: v })));
     }
+  }, [features, open]);
 
-    setDragList(toItemInterfaceArray(val));
-    onChange(recordKey, val);
-  };
-
-  const onCloseTag = (id: string) => {
-    const newList = dragList.filter((item) => item.id !== id);
-    setDragList(newList);
-    onChange(recordKey, fromItemInterfaceArray(newList));
-  };
-
-  const tagRender = (props: any) => {
-    const { label, closable, onClose } = props;
-    const color = tagColors[label] || 'default';
-    return (
-      <Tag color={color} closable={closable} onClose={onClose} style={{ userSelect: 'none' }}>
-        {label}
-      </Tag>
+  const filteredOptions = React.useMemo(() => {
+    const existingMatch = allOptions.filter((opt) =>
+      opt.toLowerCase().includes(searchValue.toLowerCase())
     );
-  };
-
-  const existingMatch = options.filter((opt) =>
-    opt.value.toLowerCase().includes(searchValue.toLowerCase())
-  );
-
-  const searchValueExists = searchValue && !options.some((opt) => opt.value === searchValue);
-
-  const filteredOptions = searchValueExists
-    ? [
+    const exists = allOptions.some(
+      (opt) => opt.toLowerCase() === searchValue.trim().toLowerCase()
+    );
+    if (searchValue.trim() === '') return existingMatch;
+    if (!exists) {
+      return [
         {
           label: `➕ ${searchValue}`,
           value: searchValue,
+          isNew: true,
         },
-        ...existingMatch,
-      ]
-    : existingMatch;
+        ...existingMatch.map((v) => ({ label: v, value: v })),
+      ];
+    }
+    return existingMatch.map((v) => ({ label: v, value: v }));
+  }, [searchValue, allOptions]);
+
+  const onSort = (newList: ItemInterface[]) => {
+    setDragList(newList);
+    onChange(recordKey, newList.map((item) => item.value));
+  };
+
+  const toggleFeature = (val: string) => {
+    let newList = [];
+    if (features.includes(val)) {
+      newList = features.filter((v) => v !== val);
+    } else {
+      newList = [...features, val];
+    }
+    onChange(recordKey, newList);
+  };
+
+  const removeTag = (id: string) => {
+    const newList = dragList.filter((item) => item.id !== id);
+    setDragList(newList);
+    onChange(recordKey, newList.map((i) => i.value));
+  };
+
+  // ปิด dropdown เมื่อคลิกนอก element
+  React.useEffect(() => {
+    let clickedInside = false;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      clickedInside = containerRef.current?.contains(event.target as Node) ?? false;
+    };
+
+    const handleClick = () => {
+      if (!clickedInside) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('click', handleClick);
+    };
+  }, []);
 
   return (
-    <div>
-      <style>
-        {`
-          .custom-select .ant-select-selector {
-            border: 1px solid transparent !important;
-            box-shadow: none !important;
-            transition: border-color 0.2s;
-          }
-          .custom-select:hover .ant-select-selector {
-            border-color: #d9d9d9 !important;
-            border-radius: 6px;
-          }
-        `}
-      </style>
+    <div style={{ position: 'relative' }} ref={containerRef}>
+      {/* 🔻 Trigger */}
+      <div
+        className='custom-select'
+        onClick={() => {
+          requestAnimationFrame(() => {
+            setOpen((prev) => {
+              const nextOpen = !prev;
+              if (nextOpen) {
+                setSearchValue('');
+              }
+              return nextOpen;
+            });
+          });
+        }}
+      >
+        {features.length === 0 ? (
+          <span style={{ color: '#aaa', marginLeft: 10 }}>
+            <span
+              style={{
+                color: '#8D8D8D',
+                display: 'inline-block',
+                width: '8px',
+                borderBottom: '1px solid #8D8D8D',
+                verticalAlign: 'middle',
+                lineHeight: 'normal',
+                textAlign: 'left',
+              }}
+            >
+              {/* ไม่มีข้อความ */}
+            </span>
+          </span>
+        ) : (
+          features.map((tag) => (
+            <Tag key={tag} color={tagColors[tag] || 'blue'} style={{ userSelect: 'none' }}>
+              {tag}
+            </Tag>
+          ))
+        )}
+      </div>
 
-      <Row gutter={8} align="middle" wrap={false}>
-        <Col style={{ flex: 1, minWidth: 0 }}>
-          {isDragMode ? (
+      {/* ⬇️ Dropdown */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 1000,
+            background: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            borderRadius: 6,
+            marginTop: 4,
+            padding: 8,
+            width: 300,
+          }}
+        >
+          {/* 🟥 ส่วนที่ 1: tag ที่เลือกไว้ → ลากเรียงได้ */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 12, marginBottom: 4, color: '#888' }}>รายการที่เลือก</div>
             <ReactSortable
               list={dragList}
               setList={onSort}
@@ -144,11 +182,11 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
               {dragList.map((item) => (
                 <Tag
                   key={item.id}
-                  color={tagColors[item.value]}
+                  color={tagColors[item.value] || 'blue'}
                   closable
                   onClose={(e) => {
                     e.preventDefault();
-                    onCloseTag(item.id);
+                    removeTag(item.id);
                   }}
                   style={{ cursor: 'move', userSelect: 'none' }}
                 >
@@ -156,74 +194,83 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
                 </Tag>
               ))}
             </ReactSortable>
-          ) : (
-            <Select
-              mode="tags"
-              size="small"
-              style={{ width: '100%', border: 'none' }}
-              value={features}
-              options={filteredOptions}
-              onChange={onSelectChange}
-              tagRender={tagRender}
-              className="custom-select"
-              showSearch
-              filterOption={false}
-              onSearch={setSearchValue}
-              onBlur={() => setSearchValue('')}
-              popupRender={() => (
-                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                  {filteredOptions.map((opt) => {
-                    const isSelected = features.includes(opt.value);
-                    return (
-                      <div
-                        key={opt.value}
-                        style={{
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          backgroundColor: isSelected ? '#e6f7ff' : undefined,
-                          borderRadius: 4,
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const newVal = isSelected
-                            ? features.filter((v) => v !== opt.value)
-                            : [...features, opt.value];
-                          onSelectChange(newVal);
-                          setSearchValue('');
-                        }}
-                      >
-                        <Tag color={tagColors[opt.value] || 'default'} style={{ marginRight: 8 }}>
-                          {opt.label}
-                        </Tag>
-                        {isSelected && (
-                          <CheckOutlined style={{ color: 'green', marginLeft: 'auto' }} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            />
-          )}
-        </Col>
-        <Col style={{ width: 32, textAlign: 'center' }}>
-          <Tooltip title={isDragMode ? 'เลิกจัดลำดับ' : 'จัดลำดับ'}>
-            <SwapOutlined
-              onClick={() => setIsDragMode(!isDragMode)}
+          </div>
+
+          {/* 🔍 ช่องค้นหา/เพิ่มใหม่ */}
+          <div style={{ marginBottom: 8 }}>
+            <input
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder="ค้นหาหรือเพิ่มคุณสมบัติ"
               style={{
-                fontSize: 18,
-                cursor: 'pointer',
-                color: isDragMode ? '#bc00e2ff' : '#919191ff',
+                width: '100%',
+                border: 'none',
+                outline: 'none',
+                borderBottom: '1px solid #ddd',
+                padding: '4px 8px',
+                fontSize: 13,
               }}
             />
-          </Tooltip>
-        </Col>
-      </Row>
+          </div>
+
+          {/* 🟦 ส่วนที่ 2: tag ที่ยังไม่ได้เลือก */}
+          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+            <div style={{ fontSize: 12, marginBottom: 4, color: '#888' }}>ตัวเลือกทั้งหมด</div>
+            {filteredOptions.map((opt) => {
+              const value = typeof opt === 'string' ? opt : opt.value;
+              const label = typeof opt === 'string' ? opt : opt.label;
+              const isNew = typeof opt !== 'string' && 'isNew' in opt && opt.isNew;
+              const isSelected = features.includes(value);
+
+              return (
+                <div
+                  key={value}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    toggleFeature(value);
+                    if (isNew) {
+                      setSearchValue('');
+                      setAllOptions((prev) => {
+                        if (!prev.includes(value)) return [...prev, value];
+                        return prev;
+                      });
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    borderRadius: 4,
+                    transition: 'background 0.2s',
+                    backgroundColor: isSelected ? '#e6f7ff' : 'transparent',
+                    minWidth: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = isSelected ? '#e6f7ff' : 'transparent';
+                  }}
+                >
+                  <Tag
+                    color={tagColors[value] || 'blue'}
+                    style={{ marginRight: 8, marginBottom: 0, flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {label}
+                  </Tag>
+                  {isSelected && (
+                    <CheckOutlined style={{ color: '#1890ff', marginLeft: 8, flexShrink: 0 }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default FeatureToggle;
-
