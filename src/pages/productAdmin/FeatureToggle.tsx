@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tag } from 'antd';
 import { ReactSortable } from 'react-sortablejs';
-import { CheckOutlined } from '@ant-design/icons'; // 👈 ต้อง import ด้วย
+import { CheckOutlined } from '@ant-design/icons';
 
 interface ItemInterface {
   id: string;
@@ -32,10 +32,9 @@ const tagColors: Record<string, string> = {
 };
 
 const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onChange }) => {
-  // เปลี่ยน allOptions ให้เป็น state เพื่อเพิ่มรายการใหม่ได้
   const [allOptions, setAllOptions] = React.useState<string[]>(Object.keys(tagColors));
-  
   const [open, setOpen] = React.useState(false);
+  const [dropUp, setDropUp] = React.useState(false); // ✅ เพิ่ม state สำหรับทิศ dropdown
   const [dragList, setDragList] = React.useState<ItemInterface[]>(
     features.map((v) => ({ id: v, value: v }))
   );
@@ -46,6 +45,14 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
   React.useEffect(() => {
     if (open) {
       setDragList(features.map((v) => ({ id: v, value: v })));
+
+      // ✅ ตรวจสอบพื้นที่ด้านล่าง ถ้าชนขอบ → เปิดขึ้นบน
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const dropdownHeight = 260; // ประมาณความสูงของ dropdown
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setDropUp(spaceBelow < dropdownHeight);
+      }
     }
   }, [features, open]);
 
@@ -94,20 +101,16 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
   // ปิด dropdown เมื่อคลิกนอก element
   React.useEffect(() => {
     let clickedInside = false;
-
     const handleMouseDown = (event: MouseEvent) => {
       clickedInside = containerRef.current?.contains(event.target as Node) ?? false;
     };
-
     const handleClick = () => {
       if (!clickedInside) {
         setOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('click', handleClick);
-
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('click', handleClick);
@@ -118,14 +121,12 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
     <div style={{ position: 'relative' }} ref={containerRef}>
       {/* 🔻 Trigger */}
       <div
-        className='custom-select'
+        className="custom-select-feature"
         onClick={() => {
           requestAnimationFrame(() => {
             setOpen((prev) => {
               const nextOpen = !prev;
-              if (nextOpen) {
-                setSearchValue('');
-              }
+              if (nextOpen) setSearchValue('');
               return nextOpen;
             });
           });
@@ -143,9 +144,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
                 lineHeight: 'normal',
                 textAlign: 'left',
               }}
-            >
-              {/* ไม่มีข้อความ */}
-            </span>
+            />
           </span>
         ) : (
           features.map((tag) => (
@@ -165,9 +164,9 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
             background: '#fff',
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             borderRadius: 6,
-            marginTop: 4,
             padding: 8,
-            width: 300,
+            width: 335,
+            ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
           }}
         >
           {/* 🟥 ส่วนที่ 1: tag ที่เลือกไว้ → ลากเรียงได้ */}
@@ -214,7 +213,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
           </div>
 
           {/* 🟦 ส่วนที่ 2: tag ที่ยังไม่ได้เลือก */}
-          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 340, overflowY: 'auto' }}>
             <div style={{ fontSize: 12, marginBottom: 4, color: '#888' }}>ตัวเลือกทั้งหมด</div>
             {filteredOptions.map((opt) => {
               const value = typeof opt === 'string' ? opt : opt.value;
@@ -260,9 +259,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
                   >
                     {label}
                   </Tag>
-                  {isSelected && (
-                    <CheckOutlined style={{ color: '#1890ff', marginLeft: 8, flexShrink: 0 }} />
-                  )}
+                  {isSelected && <CheckOutlined style={{ color: '#1890ff', marginLeft: 8, flexShrink: 0 }} />}
                 </div>
               );
             })}

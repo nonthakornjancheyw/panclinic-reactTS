@@ -20,8 +20,16 @@ const { Option } = Select;
 
 const dayUseOptions = [
   { label: '-', value: '', color: '#fff' }, // ว่างจริง (ไม่มี label)
-  { label: '30 Day', value: '30 Day', color: '#ff85c0' },
-  { label: '60 Day', value: '60 Day', color: '#9254de' },
+  { label: '7 Day', value: '7', color: '#37bdfcff' },
+  { label: '14 Day', value: '14', color: '#0fbe98ff' },
+  { label: '15 Day', value: '15', color: '#fd7536ff' },
+  { label: '20 Day', value: '20', color: '#97ce00ff' },
+  { label: '30 Day', value: '30', color: '#ff85c0' },
+  { label: '40 Day', value: '40', color: '#ffd000e8' },
+  { label: '45 Day', value: '45', color: '#c4115bff' },
+  { label: '60 Day', value: '60', color: '#9254de' },
+  { label: '120 Day', value: '120', color: '#707be0ff' },
+  { label: '180 Day', value: '180', color: '#4f00ceff' },
 ];
 
 
@@ -229,10 +237,10 @@ export default function ProductAdminTable() {
           key: item.ProductID,
           name: item.Name,
           features: tagWithPriority.map((t) => t.tag),
-          dayUse: '',
-          frequency: '',
+          dayUse: item.DayUse,
+          frequency: item.FrequencyWk,
           productGroup: [],
-          time: '',
+          time: item.ServeTime,
         };
       });
 

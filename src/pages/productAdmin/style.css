@@ -17,13 +17,17 @@
   font-size: 13px;
 }
 
-.custom-select {
+.custom-select-feature {
   border: 1px solid transparent;
   border-radius: 6px;
   transition: border-color 0.2s;
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 4px; /* ระยะห่างเฉพาะบรรทัด (บน-ล่าง) */
+  /* padding: 4px; */
 }
 
-.custom-select:hover {
+.custom-select-feature:hover {
   border-color: #d9d9d9;
   cursor: pointer; /* เพิ่ม cursor pointer ให้รู้ว่าคลิกได้ */
 }
