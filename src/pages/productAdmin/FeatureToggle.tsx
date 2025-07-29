@@ -11,27 +11,12 @@ interface ItemInterface {
 interface FeatureToggleProps {
   features: string[];
   recordKey: string;
+  tagColors: Record<string, string>;
   onChange: (key: string, value: string[]) => void;
+  onAddNewTag?: (newTag: string) => Promise<boolean>;
 }
 
-const tagColors: Record<string, string> = {
-  'ชุดเซลล์ผิวเก่า': 'blue',
-  'คิวเท็นผิวกระชับ': 'magenta',
-  'ลดรอยดำ': 'volcano',
-  'ลดรอยฝ้ากระ': 'gray',
-  'สีผิวสม่ำเสมอ': 'orange',
-  'เคลือบผิว': 'lime',
-  'ให้ความชุ่มชื้น': 'green',
-  'กระชับ': 'pink',
-  'ตึงเนื้อ': 'purple',
-  'เปล่งปลั่ง': 'cyan',
-  'ลดริ้วรอย': '#108ee9',
-  'ให้อาหารผิว': '#f50',
-  'เติมออกซิเจนให้ผิว': '#ff7dd4ff',
-  'เพิ่มคอลลาเจน': '#009751ff',
-};
-
-const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onChange }) => {
+const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagColors, onChange, onAddNewTag }) => {
   const [allOptions, setAllOptions] = React.useState<string[]>(Object.keys(tagColors));
   const [open, setOpen] = React.useState(false);
   const [dropUp, setDropUp] = React.useState(false); // ✅ เพิ่ม state สำหรับทิศ dropdown
@@ -82,7 +67,15 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
     onChange(recordKey, newList.map((item) => item.value));
   };
 
-  const toggleFeature = (val: string) => {
+  const toggleFeature = async (val: string, isNew?: boolean) => {
+  if (isNew && onAddNewTag) {
+    const success = await onAddNewTag(val);
+    if (!success) {
+      // handle error หรือแจ้ง user ว่าเพิ่มไม่สำเร็จ
+      return;
+    }
+  }
+  
     let newList = [];
     if (features.includes(val)) {
       newList = features.filter((v) => v !== val);
@@ -91,6 +84,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
     }
     onChange(recordKey, newList);
   };
+
 
   const removeTag = (id: string) => {
     const newList = dragList.filter((item) => item.id !== id);
@@ -116,6 +110,12 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
       document.removeEventListener('click', handleClick);
     };
   }, []);
+
+  //เชื่อมกับparent(ไฟล์productAdminPaige)
+  React.useEffect(() => {
+    setAllOptions(Object.keys(tagColors));
+  }, [tagColors]);
+
 
   return (
     <div style={{ position: 'relative' }} ref={containerRef}>
@@ -224,9 +224,9 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, onCh
               return (
                 <div
                   key={value}
-                  onMouseDown={(e) => {
+                  onMouseDown={async (e) => {
                     e.preventDefault();
-                    toggleFeature(value);
+                    await toggleFeature(value, isNew);
                     if (isNew) {
                       setSearchValue('');
                       setAllOptions((prev) => {

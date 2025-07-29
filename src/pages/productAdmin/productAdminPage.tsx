@@ -28,6 +28,7 @@ const dayUseOptions = [
   { label: '40 Day', value: '40', color: '#ffd000e8' },
   { label: '45 Day', value: '45', color: '#c4115bff' },
   { label: '60 Day', value: '60', color: '#9254de' },
+  { label: '90 Day', value: '90', color: '#de5494ff' },
   { label: '120 Day', value: '120', color: '#707be0ff' },
   { label: '180 Day', value: '180', color: '#4f00ceff' },
 ];
@@ -53,10 +54,33 @@ const productGroupOptions = [
 ];
 
 const timeOptions = [
-  { label: 'Time1', value: 'Time1', color: '#69c0ff' },
-  { label: 'Time2', value: 'Time2', color: '#ff9c6e' },
-  { label: 'Time3', value: 'Time3', color: '#b37feb' },
+  { label: '0', value: '0', color: '#d9d9d9' },
+  { label: '5', value: '5', color: '#69c0ff' },
+  { label: '10', value: '10', color: '#ff9c6e' },
+  { label: '15', value: '15', color: '#b37feb' },
+  { label: '20', value: '20', color: '#95de64' },
+  { label: '25', value: '25', color: '#ffd666' },
+  { label: '30', value: '30', color: '#5cdbd3' },
+  { label: '35', value: '35', color: '#ffa39e' },
+  { label: '40', value: '40', color: '#73d13d' },
+  { label: '45', value: '45', color: '#ff85c0' },
+  { label: '50', value: '50', color: '#1b4be9ff' },
+  { label: '60', value: '60', color: '#ffc069' },
+  { label: '70', value: '70', color: '#85a5ff' },
+  { label: '75', value: '75', color: '#ff7875' },
+  { label: '80', value: '80', color: '#36cfc9' },
+  { label: '90', value: '90', color: '#ffc53d' },
+  { label: '100', value: '100', color: '#69c0ff' },
+  { label: '105', value: '105', color: '#ff9c6e' },
+  { label: '110', value: '110', color: '#b37feb' },
+  { label: '120', value: '120', color: '#0fbe98ff' },
+  { label: '140', value: '140', color: '#ffd666' },
+  { label: '150', value: '150', color: '#5cdbd3' },
+  { label: '165', value: '165', color: '#ffa39e' },
+  { label: '180', value: '180', color: '#73d13d' },
+  { label: '240', value: '240', color: '#ff85c0' },
 ];
+
 
 
 interface ProductRow {
@@ -89,7 +113,8 @@ const renderSelectCell = <Field extends keyof ProductRow>(
   const currentValue =
     Array.isArray(value) && value.length > 0 ? value[0] : (value as string) || '';
 
-  const isEmpty = !currentValue || currentValue === '';
+  const isEmpty = currentValue === '' || currentValue === '0';
+
 
   return (
     <Select
@@ -153,7 +178,8 @@ export default function ProductAdminTable() {
 
   const [allBrands, setAllBrands] = useState<Brand[]>([]); //เก็บbrandทั้งหมด
   const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]); // เอาไว้ bind Select
-  
+  const [tagColors, setTagColors] = React.useState<Record<string, string>>({});
+
   const [search, setSearch] = useState({
     nameProduct: '',
     categoryID: undefined as string | undefined,
@@ -173,6 +199,7 @@ export default function ProductAdminTable() {
       const data = await productApi.GetFetch() as {
         category: { rptCategoryID: string; rptCategoryName: string }[];
         brand: { CategoryID: string; CategoryName: string; BrandID: string; BrandName: string; CategoryOrder: number }[];
+        tag: { TagID: string; TagName: string }[];
       };
 
       // เก็บประเภท
@@ -190,10 +217,51 @@ export default function ProductAdminTable() {
       setSearch(prev => ({ ...prev, categoryID: 'ALL' }));
       setFilteredBrands(transformedBrands); // เริ่มต้นแสดงแบรนด์ทั้งหมด
 
+      const getTag = await productApi.GetTag() as {
+        tag: { TagID: string; TagName: string }[];
+      };
+      const predefinedColors = [
+        'blue', 'magenta', 'volcano', 'gray', 'orange', 'lime',
+        'green', 'pink', 'purple', 'cyan', '#108ee9', '#f50',
+        '#ff7dd4ff', '#009751ff'
+      ];
+      const generatedTagColors: Record<string, string> = {};
+      getTag.tag.forEach((tag, index) => {
+        generatedTagColors[tag.TagName] = predefinedColors[index % predefinedColors.length];
+      });
+
+      setTagColors(generatedTagColors);
       handleSearch(1);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
+  };
+
+  const fetchTags = async () => {
+    const getTag = await productApi.GetTag() as {
+        tag: { TagID: string; TagName: string }[];
+      };
+      const predefinedColors = [
+        'blue', 'magenta', 'volcano', 'gray', 'orange', 'lime',
+        'green', 'pink', 'purple', 'cyan', '#108ee9', '#f50',
+        '#ff7dd4ff', '#009751ff'
+      ];
+      const generatedTagColors: Record<string, string> = {};
+      getTag.tag.forEach((tag, index) => {
+        generatedTagColors[tag.TagName] = predefinedColors[index % predefinedColors.length];
+      });
+
+      setTagColors(generatedTagColors);
+  };
+
+
+  const handleAddNewTag = async (newTag: string) => {
+    const res = await productApi.AddTag(newTag);
+    if (res.success) {
+      await fetchTags();
+      return true;
+    }
+    return false;
   };
 
 
@@ -435,9 +503,11 @@ export default function ProductAdminTable() {
         <FeatureToggle
           features={features || []}
           recordKey={record.key}
+          tagColors={tagColors}
           onChange={(key, newFeatures) => {
             setData(prev => prev.map(item => (item.key === key ? { ...item, features: newFeatures } : item)));
           }}
+          onAddNewTag={handleAddNewTag}
         />
       ),
     },
@@ -446,7 +516,11 @@ export default function ProductAdminTable() {
       dataIndex: 'dayUse',
       width: 160,
       className: "custom-select-ant",
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      sorter: (a, b) => {
+        const aVal = parseInt(a.dayUse || '0', 10);
+        const bVal = parseInt(b.dayUse || '0', 10);
+        return aVal - bVal;
+      },
       render: (value, record) =>
         renderSelectCell('' + value, record, dayUseOptions, 'dayUse', handleChange),
     },
@@ -473,9 +547,14 @@ export default function ProductAdminTable() {
       dataIndex: 'time',
       width: 150,
       className: "custom-select-ant",
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      sorter: (a, b) => {
+        const aVal = parseInt(a.time || '0', 10);
+        const bVal = parseInt(b.time || '0', 10);
+        return aVal - bVal;
+      },
       render: (value, record) =>
-        renderSelectCell(value, record, timeOptions, 'time', handleChange),
+        // renderSelectCell(value, record, timeOptions, 'time', handleChange),
+        renderSelectCell('' + value, record, timeOptions, 'time', handleChange),
     },
   ];
 
@@ -514,7 +593,7 @@ export default function ProductAdminTable() {
             <Col style={{ display: 'flex', flexDirection: 'column' }}>
               <Text strong>ยี่ห้อ</Text>
               <Select
-                mode="tags"
+                mode="multiple"
                 style={{ width: 500 }}
                 value={search.brandID}
                 onChange={function (val) {
@@ -524,6 +603,15 @@ export default function ProductAdminTable() {
                 }}
                 placeholder="เลือกยี่ห้อ"
                 virtual
+                showSearch
+                filterOption={(input, option) => {
+                  const text = typeof option?.children === 'string'
+                    ? option.children
+                    : '';
+
+                  return text.toLowerCase().indexOf(input.toLowerCase()) >= 0;
+                }}
+
               >
                 {filteredBrands.map(function (brand) {
                   return (
@@ -533,6 +621,7 @@ export default function ProductAdminTable() {
                   );
                 })}
               </Select>
+
             </Col>
 
             <Col style={{ display: 'flex', flexDirection: 'column' }}>
