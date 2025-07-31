@@ -50,4 +50,17 @@ export async function AddTag(newTag: string): Promise<AddTagResponse> {
   }
 }
 
+export async function SaveProduct(data: any): Promise<AddTagResponse> {
+  try {
+    const response = await axios.post<AddTagResponse>(
+      'http://localhost:3000/api/productAdmin/SaveProduct',
+      { data }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('SaveProduct error:', error);
+    return { success: false };
+  }
+}
+
 

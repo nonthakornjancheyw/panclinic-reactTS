@@ -4,12 +4,12 @@ import FeatureToggle from './FeatureToggle';
 import { 
   Table, Select, Spin, Row, Layout, Card, 
   Col, Pagination, Button, Input, Space,
-  message, Typography, Tag
+  message, Typography,
 } from 'antd';
 const { Text } = Typography;
 import type { InputRef, TableColumnType } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { SearchOutlined, SaveOutlined, LineOutlined } from '@ant-design/icons';
+import { SearchOutlined, SaveOutlined } from '@ant-design/icons';
 import type { FilterDropdownProps } from 'antd/es/table/interface';
 import * as productApi from './productApi';
 import './style.css';
@@ -85,6 +85,11 @@ const timeOptions = [
 
 interface ProductRow {
   key: string;
+  categoryID: string;
+  brand: string;
+  class: string;
+  productID: string;
+  productUniqueID: string;
   name: string;
   features: string[];
   dayUse: string;
@@ -101,29 +106,34 @@ interface Brand {
   CategoryOrder: number;
 }
 
+interface TagOption {
+  label: string;    // TagName
+  value: string;    // TagID
+  color: string;    // สี
+}
+
+
 type Option = { label: string; value: string; color?: string };
 const renderSelectCell = <Field extends keyof ProductRow>(
   value: ProductRow[Field],
   record: ProductRow,
   options: Option[],
   field: Field,
-  handleChange: (key: string, field: Field, value: ProductRow[Field]) => void
+  handleChange: (key: string, field: Field, value: ProductRow[Field]) => void,
+  disabled = false
 ) => {
-  // จัดการกรณี array (เช่น productGroup: string[])
   const currentValue =
     Array.isArray(value) && value.length > 0 ? value[0] : (value as string) || '';
 
   const isEmpty = currentValue === '' || currentValue === '0';
-
 
   return (
     <Select
       size="small"
       style={{
         width: '100%',
-        backgroundColor:
-          options.find((o) => o.value === currentValue)?.color || '#fff',
-        color: '#fff',
+        backgroundColor: disabled ? '#f0f0f0' : (options.find((o) => o.value === currentValue)?.color || '#fff'),
+        color: disabled ? '#aaa' : '#fff',
         borderRadius: 4,
         textAlign: isEmpty ? 'left' : 'center',
       }}
@@ -148,7 +158,7 @@ const renderSelectCell = <Field extends keyof ProductRow>(
             <div
               style={{
                 backgroundColor: opt.color || '#fff',
-                color: opt.value ? '#fff' : '#8D8D8D',
+                color: opt.value ? (disabled ? '#aaa' : '#fff') : '#8D8D8D',
                 textAlign: 'center',
                 borderRadius: 4,
                 padding: '2px 8px',
@@ -160,11 +170,12 @@ const renderSelectCell = <Field extends keyof ProductRow>(
         }))
       }
       onChange={(val) => {
-        // ถ้า field เป็น productGroup (string[]) ต้องเก็บเป็น array
+        if (disabled) return;
         const newValue = (Array.isArray(value) ? [val] : val) as ProductRow[Field];
         handleChange(record.key, field, newValue);
       }}
-      suffixIcon={null} // ซ่อน icon dropdown
+      suffixIcon={null}
+      disabled={disabled}
     />
   );
 };
@@ -178,7 +189,9 @@ export default function ProductAdminTable() {
 
   const [allBrands, setAllBrands] = useState<Brand[]>([]); //เก็บbrandทั้งหมด
   const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]); // เอาไว้ bind Select
-  const [tagColors, setTagColors] = React.useState<Record<string, string>>({});
+
+  // const [tagColors, setTagColors] = React.useState<Record<string, string>>({});
+  const [tagOptions, setTagOptions] = React.useState<TagOption[]>([]); //เก็บ tag 
 
   const [search, setSearch] = useState({
     nameProduct: '',
@@ -189,10 +202,7 @@ export default function ProductAdminTable() {
 
   const [data, setData] = useState<ProductRow[]>([]);
   const [originalData, setOriginalData] = useState<ProductRow[]>([]);
-
-
   const searchInput = useRef<InputRef>(null);
-
 
   const fetchData = async () => {
     try {
@@ -217,20 +227,7 @@ export default function ProductAdminTable() {
       setSearch(prev => ({ ...prev, categoryID: 'ALL' }));
       setFilteredBrands(transformedBrands); // เริ่มต้นแสดงแบรนด์ทั้งหมด
 
-      const getTag = await productApi.GetTag() as {
-        tag: { TagID: string; TagName: string }[];
-      };
-      const predefinedColors = [
-        'blue', 'magenta', 'volcano', 'gray', 'orange', 'lime',
-        'green', 'pink', 'purple', 'cyan', '#108ee9', '#f50',
-        '#ff7dd4ff', '#009751ff'
-      ];
-      const generatedTagColors: Record<string, string> = {};
-      getTag.tag.forEach((tag, index) => {
-        generatedTagColors[tag.TagName] = predefinedColors[index % predefinedColors.length];
-      });
-
-      setTagColors(generatedTagColors);
+      await fetchTags();
       handleSearch(1);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -239,21 +236,23 @@ export default function ProductAdminTable() {
 
   const fetchTags = async () => {
     const getTag = await productApi.GetTag() as {
-        tag: { TagID: string; TagName: string }[];
-      };
-      const predefinedColors = [
-        'blue', 'magenta', 'volcano', 'gray', 'orange', 'lime',
-        'green', 'pink', 'purple', 'cyan', '#108ee9', '#f50',
-        '#ff7dd4ff', '#009751ff'
-      ];
-      const generatedTagColors: Record<string, string> = {};
-      getTag.tag.forEach((tag, index) => {
-        generatedTagColors[tag.TagName] = predefinedColors[index % predefinedColors.length];
-      });
+      tag: { TagID: string; TagName: string }[];
+    };
 
-      setTagColors(generatedTagColors);
+    const predefinedColors = [
+      'blue', 'magenta', 'volcano', 'gray', 'orange', 'lime',
+      'green', 'pink', 'purple', 'cyan', '#108ee9', '#f50',
+      '#ff7dd4ff', '#009751ff'
+    ];
+
+    const options = getTag.tag.map((tag, index) => ({
+      label: tag.TagName,
+      value: tag.TagID,
+      color: predefinedColors[index % predefinedColors.length],
+    }));
+
+    setTagOptions(options);
   };
-
 
   const handleAddNewTag = async (newTag: string) => {
     const res = await productApi.AddTag(newTag);
@@ -264,6 +263,9 @@ export default function ProductAdminTable() {
     return false;
   };
 
+  // useEffect(() => {
+  //   console.log('tagOptions=',tagOptions)
+  // }, [tagOptions]);
 
   useEffect(() => {
     fetchData();
@@ -285,8 +287,6 @@ export default function ProductAdminTable() {
 
   const handleSearch = async (page = 1) => {
     try {
-      console.log('handleSearch')
-      console.log('brandID=',search.brandID)
       setSpinning(true)
       const selectedCategoryID = search.categoryID || 'ALL';
       const response: any = await productApi.GetProduct( search.nameProduct, selectedCategoryID, search.brandID, search.statusTag, page, PAGE_SIZE);
@@ -303,6 +303,11 @@ export default function ProductAdminTable() {
 
         return {
           key: item.ProductID,
+          categoryID: item.CategoryID,
+          brand: item.Brand,
+          class: item.Class,
+          productID: item.ProductID,
+          productUniqueID: item.ProductUniqueID,
           name: item.Name,
           features: tagWithPriority.map((t) => t.tag),
           dayUse: item.DayUse,
@@ -321,82 +326,183 @@ export default function ProductAdminTable() {
       setSpinning(false);
     }
   };
-
   const handleSave = async () => {
-  try {
-    const changedItems = data
-      .map(function (currentItem) {
-        const originalItem = originalData.find(function (o) {
-          return o.key === currentItem.key;
-        });
+    try {
+      setSpinning(true)
+      const changedItems = data
+        .map(function (currentItem) {
+          const originalItem = originalData.find(function (o) {
+            return o.key === currentItem.key;
+          });
+          if (!originalItem) return null;
 
-        if (!originalItem) return null;
+          // ========== Features ==========
+          const originalTags = originalItem.features || [];
+          const currentTags = currentItem.features || [];
+          const originalSet = new Set(originalTags);
 
-        const originalTags = originalItem.features || [];
-        const currentTags = currentItem.features || [];
-        const originalSet = new Set(originalTags);
+          const tagsWithStatus = currentTags.map(function (tagName, index) {
+            const newPriority = index + 1;
+            const oldIndex = originalTags.indexOf(tagName);
+            const oldPriority = oldIndex + 1;
 
-        // ตรวจสอบ tag ปัจจุบันทั้งหมด เรียงตามลำดับจริง
-        const tagsWithStatus = currentTags.map(function (tag, index) {
-          const newPriority = index + 1;
-          const oldIndex = originalTags.indexOf(tag);
-          const oldPriority = oldIndex + 1;
+            const tagOption = tagOptions.find(function (t) {
+              return t.label === tagName;
+            });
+            const tagID = tagOption ? tagOption.value : '';
 
-          if (!originalSet.has(tag)) {
+            if (!originalSet.has(tagName)) {
+              return { tagID, tagName, tagStatus: 'Add', priority: newPriority };
+            }
+
             return {
-              tagName: tag,
-              tagStatus: 'Add',
+              tagID,
+              tagName,
+              tagStatus: oldPriority === newPriority ? 'Unchanged' : 'Reorder',
               priority: newPriority,
-            };
-          }
-
-          return {
-            tagName: tag,
-            tagStatus: oldPriority === newPriority ? 'Unchanged' : 'Reorder',
-            priority: newPriority,
-          };
-        });
-
-        // ตรวจสอบ tag ที่หายไปจากรายการใหม่ (ลบ)
-        const removedTags = originalTags
-          .filter(function (tag) {
-            return !currentTags.includes(tag);
-          })
-          .map(function (tag) {
-            return {
-              tagName: tag,
-              tagStatus: 'Remove',
-              priority: 0,
             };
           });
 
-        const allChanges = [...tagsWithStatus, ...removedTags];
+          const deleteTags = originalTags
+            .filter(function (tagName) {
+              return !currentTags.includes(tagName);
+            })
+            .map(function (tagName) {
+              const tagOption = tagOptions.find(function (t) {
+                return t.label === tagName;
+              });
+              const tagID = tagOption ? tagOption.value : '';
+              return { tagID, tagName, tagStatus: 'Delete', priority: 0 };
+            });
 
-        // ถือว่าเปลี่ยน ถ้าอย่างน้อย 1 tag ไม่ใช่ 'Unchanged' หรือมี tag ที่หายไป
-        const isChanged = allChanges.some(function (t) {
-          return t.tagStatus !== 'Unchanged';
-        });
+          const allTagChanges = [...tagsWithStatus, ...deleteTags];
+          const isTagChanged = allTagChanges.some(function (t) {
+            return t.tagStatus !== 'Unchanged';
+          });
 
-        if (isChanged) {
-          return {
-            ...currentItem,
-            features: allChanges,
+          // ========== dayUse ==========
+          const originalDayUse = parseInt(originalItem.dayUse || '0', 10);
+          const currentDayUse = parseInt(currentItem.dayUse || '0', 10);
+          const isDayUseChanged = originalDayUse !== currentDayUse;
+
+          const dayUse = {
+            productID: currentItem.productID,
+            status: isDayUseChanged ? 'Change' : 'Unchange',
+            value: currentDayUse,
           };
+
+          // ========== frequency ==========
+          const originalFrequency = originalItem.frequency || '';
+          const currentFrequency = currentItem.frequency || '';
+          const isFrequencyChanged = originalFrequency !== currentFrequency;
+
+          const frequency = {
+            productID: currentItem.productID,
+            status: isFrequencyChanged ? 'Change' : 'Unchange',
+            value: currentFrequency,
+          };
+
+
+          // ========== productGroup ==========
+          const originalGroup = originalItem.productGroup || [];
+          const currentGroup = currentItem.productGroup || [];
+
+          const addedGroups = currentGroup
+            .filter(function (g) {
+              return !originalGroup.includes(g);
+            })
+            .map(function (groupID) {
+              return { groupID, status: 'Add' };
+            });
+
+          const deletedGroups = originalGroup
+            .filter(function (g) {
+              return !currentGroup.includes(g);
+            })
+            .map(function (groupID) {
+              return { groupID, status: 'Delete' };
+            });
+
+          const unchangedGroups = currentGroup
+            .filter(function (g) {
+              return originalGroup.includes(g);
+            })
+            .map(function (groupID) {
+              return { groupID, status: 'Unchanged' };
+            });
+
+          const allGroups = [...addedGroups, ...deletedGroups, ...unchangedGroups];
+
+          const isProductGroupChanged = allGroups.some(function (g) {
+            return g.status !== 'Unchanged';
+          });
+          // ========== time ==========
+          const originalTime = parseInt(originalItem.time || '0', 10);
+          const currentTime = parseInt(currentItem.time || '0', 10);
+          const isTimeChanged = originalTime !== currentTime;
+
+          const time = {
+            productID: currentItem.productID,
+            status: isTimeChanged ? 'Change' : 'Unchange',
+            value: currentTime,
+          };
+
+          const isSomethingChanged = isTagChanged || isDayUseChanged ||isFrequencyChanged || isProductGroupChanged || isTimeChanged;
+
+          if (isSomethingChanged) {
+            return {
+              ...currentItem,
+              features: allTagChanges,
+              dayUse: [dayUse],
+              frequency: [frequency],
+              productGroup: [allGroups],
+              time: [time],
+            };
+          }
+
+          return null;
+        })
+        .filter((item): item is Exclude<typeof item, null> => item !== null);
+
+      // ======= Group by productUniqueID =======
+      const groupedByUniqueID: Record<string, any> = {};
+
+      changedItems.forEach(function (item) {
+        const uniqueID = item.productUniqueID;
+
+        if (!groupedByUniqueID[uniqueID]) {
+          groupedByUniqueID[uniqueID] = {
+            ...item,
+            productID: [item.productID],
+            dayUse: [...item.dayUse],
+            productGroup: [...item.productGroup],
+          };
+        } else {
+          groupedByUniqueID[uniqueID].productID.push(item.productID);
+          groupedByUniqueID[uniqueID].dayUse.push(...item.dayUse);
+          groupedByUniqueID[uniqueID].productGroup.push(...item.productGroup);
+          groupedByUniqueID[uniqueID].features.push(...item.features);
         }
+      });
 
-        return null;
-      })
-      .filter(Boolean);
-
-    console.log('รายการที่เปลี่ยนแปลงทั้งหมด:', changedItems);
-    message.success('บันทึกเรียบร้อยแล้ว');
-  } catch (error) {
-    console.error('เกิดข้อผิดพลาดขณะบันทึก:', error);
-    message.error('บันทึกล้มเหลว');
-  }
-};
-
-
+      const finalChangedItems = Object.values(groupedByUniqueID);
+      if (finalChangedItems.length === 0) {
+        setSpinning(false);
+        return;
+      }
+      const saveResult = await productApi.SaveProduct(finalChangedItems);
+      if (!saveResult.success) {
+        message.error('บันทึกล้มเหลวจากเซิร์ฟเวอร์');
+        return;
+      }
+      message.success('บันทึกเรียบร้อยแล้ว');
+      handleSearch(currentPage);
+      console.log('รายการที่เปลี่ยนแปลงทั้งหมด:', finalChangedItems);
+    } catch (error) {
+      console.error('เกิดข้อผิดพลาดขณะบันทึก:', error);
+      message.error('บันทึกล้มเหลว');
+    }
+  };
 
 
   const handleNameChange = debounce((val) => {
@@ -404,10 +510,10 @@ export default function ProductAdminTable() {
   }, 300);
 
   // อัปเดตข้อมูล
-  const handleChange = (
+  const handleChange = <Field extends keyof ProductRow>(
     key: string,
-    field: keyof ProductRow,
-    value: string | string[]
+    field: Field,
+    value: ProductRow[Field]
   ) => {
     setData((prev) =>
       prev.map((item) =>
@@ -476,14 +582,14 @@ export default function ProductAdminTable() {
     {
       title: 'No.',
       dataIndex: 'index',
-      width: 70,
+      width: 50,
       align: 'center',
       render: (_, __, index) => index + 1,
     },
     {
       title: 'Product Name',
       dataIndex: 'name',
-      width: 450,
+      width: 410,
       ...getColumnSearchProps('name'),
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: function (text) {
@@ -495,6 +601,18 @@ export default function ProductAdminTable() {
       }
     },
     {
+      title: 'Unique',
+      dataIndex: 'productUniqueID',
+      width: 60,
+      align: 'center',
+    },
+    {
+      title: 'Class.',
+      dataIndex: 'class',
+      width: 100,
+      align: 'center',
+    },
+    {
       title: 'ProductFeature',
       dataIndex: 'features',
       width: 400,
@@ -503,40 +621,60 @@ export default function ProductAdminTable() {
         <FeatureToggle
           features={features || []}
           recordKey={record.key}
-          tagColors={tagColors}
+          tagOptions={tagOptions}
           onChange={(key, newFeatures) => {
-            setData(prev => prev.map(item => (item.key === key ? { ...item, features: newFeatures } : item)));
+            setData(prev => {
+              const targetItem = prev.find(item => item.key === key);
+              if (!targetItem) return prev;
+
+              const targetProductID = targetItem.productUniqueID;
+
+              // ✅ clone ให้แน่ใจว่าไม่มีการ shared reference
+              return prev.map(item => {
+                if (item.productUniqueID === targetProductID) {
+                  return {
+                    ...item,
+                    features: [...newFeatures], // ✅ clone array
+                  };
+                }
+                return item;
+              });
+            });
           }}
-          onAddNewTag={handleAddNewTag}
+        onAddNewTag={handleAddNewTag}
         />
       ),
     },
     {
       title: 'DayUse',
       dataIndex: 'dayUse',
-      width: 160,
+      width: 120,
       className: "custom-select-ant",
       sorter: (a, b) => {
         const aVal = parseInt(a.dayUse || '0', 10);
         const bVal = parseInt(b.dayUse || '0', 10);
         return aVal - bVal;
       },
-      render: (value, record) =>
-        renderSelectCell('' + value, record, dayUseOptions, 'dayUse', handleChange),
+      render: (value, record) => {
+        const disabled = !(record.categoryID === '01' || record.categoryID === '02'); // แก้ไขได้แค่ 01,02
+        return renderSelectCell('' + value, record, dayUseOptions, 'dayUse', handleChange, disabled);
+      }
     },
     {
       title: 'Frequency',
       dataIndex: 'frequency',
-      width: 150,
+      width: 120,
       className: "custom-select-ant",
       sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (value, record) =>
-        renderSelectCell('' + value, record, frequencyOptions, 'frequency', handleChange),
+      render: (value, record) => {
+        const disabled = !(record.categoryID === '03' || record.categoryID === '04'); // แก้ไขได้แค่ 03,04
+        return renderSelectCell('' + value, record, frequencyOptions, 'frequency', handleChange, disabled);
+      }
     },
     {
       title: 'ProductGroup',
       dataIndex: 'productGroup',
-      width: 200,
+      width: 160,
       className: "custom-select-ant",
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: (value, record) =>
@@ -545,16 +683,17 @@ export default function ProductAdminTable() {
     {
       title: 'Time',
       dataIndex: 'time',
-      width: 150,
+      width: 120,
       className: "custom-select-ant",
       sorter: (a, b) => {
         const aVal = parseInt(a.time || '0', 10);
         const bVal = parseInt(b.time || '0', 10);
         return aVal - bVal;
       },
-      render: (value, record) =>
-        // renderSelectCell(value, record, timeOptions, 'time', handleChange),
-        renderSelectCell('' + value, record, timeOptions, 'time', handleChange),
+      render: (value, record) => {
+        const disabled = !(record.categoryID === '03' || record.categoryID === '04'); // แก้ไขได้แค่ 03,04
+        return renderSelectCell('' + value, record, timeOptions, 'time', handleChange, disabled);
+      }
     },
   ];
 
@@ -562,7 +701,7 @@ export default function ProductAdminTable() {
     <Layout style={{ padding: 10 }}>
       <Content>
         <Card style={{ height: 'calc(95vh - 75px)', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)', }}>         
-          <Row gutter={[8, 0]} style={{ marginBottom: 8 }}>
+          <Row gutter={[8, 0]} style={{ marginBottom: 15 }}>
             <Col style={{ display: 'flex', flexDirection: 'column' }}>
               <Text strong>ชื่อสินค้า</Text>
               <Input
@@ -658,8 +797,8 @@ export default function ProductAdminTable() {
 
             <Col flex="auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
               <Button 
-                color="cyan" 
-                variant="solid"
+                type="primary"
+                style={{ backgroundColor: '#07aa30ff', borderColor: '#52c41a' }}
                 icon={<SaveOutlined />}
                 onClick={handleSave}
               >
