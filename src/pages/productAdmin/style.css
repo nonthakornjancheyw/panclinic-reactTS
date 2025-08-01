@@ -3,6 +3,7 @@
   font-size: 14px;
   transition: color 0.2s;
   padding-left: 10px !important;
+  color: '#424242ff';
 }
 
 .product-name-cell:hover {
@@ -23,13 +24,15 @@
   transition: border-color 0.2s;
   display: flex;
   flex-wrap: wrap;
-  row-gap: 4px; /* ระยะห่างเฉพาะบรรทัด (บน-ล่าง) */
-  /* padding: 4px; */
+  row-gap: 4px;
 }
-
 .custom-select-feature:hover {
   border-color: #d9d9d9;
-  cursor: pointer; /* เพิ่ม cursor pointer ให้รู้ว่าคลิกได้ */
+  cursor: pointer;
+}
+.custom-select-feature.active {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 }
 
 .custom-select-ant .ant-select-selector {

@@ -95,11 +95,6 @@ function AppLayout({ children }: Props) {
               icon: <AppstoreOutlined style={{ color: '#fff' }} />,
               label: <span style={{ color: '#fff', fontWeight: 'bold' }}>บริการ</span>,
             },
-            {
-              key: '/test',
-              icon: <InfoCircleOutlined style={{ color: '#fff' }} />,
-              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>test</span>,
-            },
           ]}
         />
 

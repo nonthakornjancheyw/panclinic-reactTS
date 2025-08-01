@@ -3,7 +3,6 @@ import AppLayout from './components/AppLayout';
 import Finance from './pages/finance/financePage';
 import Page1 from './pages/Page1';
 import ProdctAdmin from './pages/productAdmin/productAdminPage';
-import Test from './pages/finance/test';
 
 function App() {
   return (
@@ -13,7 +12,6 @@ function App() {
           <Route path="/" element={<Finance/>} />
           <Route path="/about" element={<Page1/>} />
           <Route path="/prodctAdmin" element={<ProdctAdmin/>} />
-          <Route path="/test" element={<Test />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>

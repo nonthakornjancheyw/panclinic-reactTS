@@ -19,7 +19,7 @@ const { Content } = Layout;
 const { Option } = Select;
 
 const dayUseOptions = [
-  { label: '-', value: '', color: '#fff' }, // ว่างจริง (ไม่มี label)
+  { label: '-', value: '0', color: '#d9d9d9' },
   { label: '7 Day', value: '7', color: '#37bdfcff' },
   { label: '14 Day', value: '14', color: '#0fbe98ff' },
   { label: '15 Day', value: '15', color: '#fd7536ff' },
@@ -36,14 +36,14 @@ const dayUseOptions = [
 
 
 const frequencyOptions = [
-  { label: '-', value: '', color: '#fff' }, // placeholder
-  { label: '1 Week', value: '1 Week', color: '#02bcd4' },
-  { label: '2 Week', value: '2 Week', color: '#ff4081' },
-  { label: '4 Week', value: '4 Week', color: '#ea80fc' },
-  { label: '5 Week', value: '5 Week', color: '#7c4dff' },
-  { label: '16 Week', value: '16 Week', color: '#f900ea' },
-  { label: '32 Week', value: '32 Week', color: '#af7e2e' },
-  { label: '52 Week', value: '52 Week', color: '#9b59b6' },
+  { label: '-', value: '0', color: '#d9d9d9' },
+  { label: '1 Week', value: '1', color: '#02bcd4' },
+  { label: '2 Week', value: '2', color: '#ff4081' },
+  { label: '4 Week', value: '4', color: '#ea80fc' },
+  { label: '5 Week', value: '5', color: '#7c4dff' },
+  { label: '16 Week', value: '16', color: '#f900ea' },
+  { label: '32 Week', value: '32', color: '#af7e2e' },
+  { label: '52 Week', value: '52', color: '#9b59b6' },
 ];
 
 
@@ -54,7 +54,7 @@ const productGroupOptions = [
 ];
 
 const timeOptions = [
-  { label: '0', value: '0', color: '#d9d9d9' },
+  { label: '-', value: '0', color: '#d9d9d9' },
   { label: '5', value: '5', color: '#69c0ff' },
   { label: '10', value: '10', color: '#ff9c6e' },
   { label: '15', value: '15', color: '#b37feb' },
@@ -94,7 +94,7 @@ interface ProductRow {
   features: string[];
   dayUse: string;
   frequency: string;
-  productGroup: string[]; // เปลี่ยนจาก string → string[]
+  productGroup: string; // เปลี่ยนจาก string → string[]
   time: string;
 }
 
@@ -152,7 +152,7 @@ const renderSelectCell = <Field extends keyof ProductRow>(
         />
       }
       options={
-        (isEmpty ? options.filter((opt) => opt.value !== '') : options).map((opt) => ({
+        (isEmpty ? options.filter((opt) => opt.value !== '0') : options).map((opt) => ({
           value: opt.value,
           label: (
             <div
@@ -262,10 +262,6 @@ export default function ProductAdminTable() {
     }
     return false;
   };
-
-  // useEffect(() => {
-  //   console.log('tagOptions=',tagOptions)
-  // }, [tagOptions]);
 
   useEffect(() => {
     fetchData();
@@ -392,8 +388,8 @@ export default function ProductAdminTable() {
           };
 
           // ========== frequency ==========
-          const originalFrequency = originalItem.frequency || '';
-          const currentFrequency = currentItem.frequency || '';
+          const originalFrequency = parseInt(originalItem.frequency || '0', 10); 
+          const currentFrequency = parseInt(currentItem.frequency || '0', 10);
           const isFrequencyChanged = originalFrequency !== currentFrequency;
 
           const frequency = {
@@ -404,38 +400,8 @@ export default function ProductAdminTable() {
 
 
           // ========== productGroup ==========
-          const originalGroup = originalItem.productGroup || [];
-          const currentGroup = currentItem.productGroup || [];
 
-          const addedGroups = currentGroup
-            .filter(function (g) {
-              return !originalGroup.includes(g);
-            })
-            .map(function (groupID) {
-              return { groupID, status: 'Add' };
-            });
 
-          const deletedGroups = originalGroup
-            .filter(function (g) {
-              return !currentGroup.includes(g);
-            })
-            .map(function (groupID) {
-              return { groupID, status: 'Delete' };
-            });
-
-          const unchangedGroups = currentGroup
-            .filter(function (g) {
-              return originalGroup.includes(g);
-            })
-            .map(function (groupID) {
-              return { groupID, status: 'Unchanged' };
-            });
-
-          const allGroups = [...addedGroups, ...deletedGroups, ...unchangedGroups];
-
-          const isProductGroupChanged = allGroups.some(function (g) {
-            return g.status !== 'Unchanged';
-          });
           // ========== time ==========
           const originalTime = parseInt(originalItem.time || '0', 10);
           const currentTime = parseInt(currentItem.time || '0', 10);
@@ -447,7 +413,7 @@ export default function ProductAdminTable() {
             value: currentTime,
           };
 
-          const isSomethingChanged = isTagChanged || isDayUseChanged ||isFrequencyChanged || isProductGroupChanged || isTimeChanged;
+          const isSomethingChanged = isTagChanged || isDayUseChanged ||isFrequencyChanged || isTimeChanged;
 
           if (isSomethingChanged) {
             return {
@@ -455,7 +421,7 @@ export default function ProductAdminTable() {
               features: allTagChanges,
               dayUse: [dayUse],
               frequency: [frequency],
-              productGroup: [allGroups],
+
               time: [time],
             };
           }
@@ -493,6 +459,7 @@ export default function ProductAdminTable() {
       const saveResult = await productApi.SaveProduct(finalChangedItems);
       if (!saveResult.success) {
         message.error('บันทึกล้มเหลวจากเซิร์ฟเวอร์');
+        setSpinning(false)
         return;
       }
       message.success('บันทึกเรียบร้อยแล้ว');
@@ -594,23 +561,29 @@ export default function ProductAdminTable() {
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: function (text) {
         return (
-          <span className="product-name-cell" style={{color: '#424242ff'}}> 
+          <span className="product-name-cell"> 
             {text}
           </span>
         );
       }
     },
+    // {
+    //   title: 'Product',
+    //   dataIndex: 'productID',
+    //   width: 60,
+    //   align: 'center',
+    // },
+    // {
+    //   title: 'Unique',
+    //   dataIndex: 'productUniqueID',
+    //   width: 60,
+    //   align: 'center',
+    // },
     {
-      title: 'Unique',
-      dataIndex: 'productUniqueID',
-      width: 60,
-      align: 'center',
-    },
-    {
-      title: 'Class.',
+      title: 'Class',
       dataIndex: 'class',
       width: 100,
-      align: 'center',
+      sorter: (a, b) => a.class.localeCompare(b.class),
     },
     {
       title: 'ProductFeature',
@@ -665,7 +638,7 @@ export default function ProductAdminTable() {
       dataIndex: 'frequency',
       width: 120,
       className: "custom-select-ant",
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      sorter: (a, b) => a.frequency.localeCompare(b.frequency),
       render: (value, record) => {
         const disabled = !(record.categoryID === '03' || record.categoryID === '04'); // แก้ไขได้แค่ 03,04
         return renderSelectCell('' + value, record, frequencyOptions, 'frequency', handleChange, disabled);
@@ -676,9 +649,9 @@ export default function ProductAdminTable() {
       dataIndex: 'productGroup',
       width: 160,
       className: "custom-select-ant",
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      sorter: (a, b) => a.productGroup.localeCompare(b.productGroup),
       render: (value, record) =>
-        renderSelectCell(value, record, productGroupOptions, 'productGroup', handleChange),
+        renderSelectCell('' + value, record, productGroupOptions, 'productGroup', handleChange),
     },
     {
       title: 'Time',

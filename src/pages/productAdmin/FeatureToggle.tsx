@@ -166,7 +166,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
     <div style={{ position: 'relative' }} ref={containerRef}>
       {/* 🔻 Trigger */}
       <div
-        className="custom-select-feature"
+        className={`custom-select-feature ${open ? 'active' : ''}`}
         onClick={() => {
           requestAnimationFrame(() => {
             setOpen((prev) => {
@@ -222,7 +222,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
           style={{
             position: 'absolute',
             zIndex: 1000,
-            top: dropUp ? dropdownPos.top - 260 - 4 : dropdownPos.top + 36 + 4,
+            top: dropUp ? dropdownPos.top - 328 + 2 : dropdownPos.top + 25 + 4,
             left: dropdownPos.left,
             width: dropdownPos.width,
             background: '#fff',
@@ -253,8 +253,11 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
                     color={tag?.color || 'blue'}
                     closable
                     onClose={(e) => {
+                      console.time('removeTag');
                       e.preventDefault();
+                      e.stopPropagation();
                       removeTag(item.id);
+                      console.timeEnd('removeTag');
                     }}
                     style={{ cursor: 'move', userSelect: 'none' }}
                   >
