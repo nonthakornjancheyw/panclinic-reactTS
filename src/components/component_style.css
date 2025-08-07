@@ -1,12 +1,12 @@
 .custom-menu .ant-menu-item-selected {
     background-color: #ffffff !important;
-    color: #30246c !important;
+    color: rgb(0, 115, 192) !important;
 }
 
 .custom-menu .ant-menu-item-selected .anticon {
-    color: #30246c !important;
+    color: rgb(0, 115, 192) !important;
 }
 
 .custom-menu .ant-menu-item-selected span {
-    color: #30246c !important;
+    color: rgb(0, 115, 192) !important;
 }

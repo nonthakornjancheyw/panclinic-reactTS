@@ -39,8 +39,20 @@
   border: 1px solid transparent !important;
   box-shadow: none !important;
   transition: border-color 0.2s;
+  padding: 0 !important; 
 }
-.custom-select-ant:hover .ant-select-selector {
-  border-color: #d9d9d9 !important;
-  border-radius: 6px;
+
+.custom-dayuse-dropdown .ant-select-item-option {
+  padding: 0 !important; 
+  width: 100% !important;
+}
+
+.custom-dayuse-dropdown .ant-select-item-option-content {
+  width: 100% !important; 
+  padding: 0 !important; 
+  margin: 0 !important;
+}
+
+.custom-dayuse-dropdown .ant-select-item-option-active {
+  background-color: transparent !important; 
 }

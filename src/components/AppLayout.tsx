@@ -50,7 +50,7 @@ function AppLayout({ children }: Props) {
         collapsible
         collapsed={collapsed}
         trigger={null}
-        style={{ backgroundColor: '#30246c' }}
+        style={{ backgroundColor: '#0e8dd6ff' }}
       >
         <div
           style={{
@@ -77,7 +77,7 @@ function AppLayout({ children }: Props) {
           mode="inline"
           selectedKeys={[location.pathname]}
           onClick={({ key }) => navigate(key)}
-          style={{ backgroundColor: '#30246c' }}
+          style={{ backgroundColor: '#0e8dd6ff' }}
           rootClassName="custom-menu"
           items={[
             {
@@ -91,7 +91,7 @@ function AppLayout({ children }: Props) {
               label: <span style={{ color: '#fff', fontWeight: 'bold' }}>เกี่ยวกับ</span>,
             },
             {
-              key: '/prodctAdmin',
+              key: '/productAdmin',
               icon: <AppstoreOutlined style={{ color: '#fff' }} />,
               label: <span style={{ color: '#fff', fontWeight: 'bold' }}>บริการ</span>,
             },
@@ -109,7 +109,7 @@ function AppLayout({ children }: Props) {
 
             <Dropdown menu={{ items: userMenuItems, onClick: onUserMenuClick }} trigger={['click']}>
               <a onClick={(e) => e.preventDefault()} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                <Space style={{ color: '#30246c' }}>
+                <Space style={{ color: '#0e8dd6ff' }}>
                   {userInfo.employeeId}: {userInfo.name} [{userInfo.branch}] <UserOutlined />
                   <DownOutlined />
                 </Space>

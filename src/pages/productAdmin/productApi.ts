@@ -1,11 +1,11 @@
 import axios from 'axios';
 // const BASE_URL = import.meta.env.VITE_API_DOMAIN || `http://localhost:3000`;
-
+const BASE_URL = import.meta.env.VITE_API_DOMAIN || 'http://localhost:3001';
 
 export async function GetFetch() {
   try {
-    // const response = await axios.get(`http://localhost:3000/api/productAdmin/GetFetch`);
-    const response = await axios.get(`http://localhost:3000/api/productAdmin/GetFetch`);
+    // const response = await axios.get(`${BASE_URL}/api/productAdmin/GetFetch`);
+    const response = await axios.get(`${BASE_URL}/api/productAdmin/GetFetch`);
     return response.data;
   } catch (error) {
     console.error(`fetchProducts error:`, error);
@@ -14,7 +14,7 @@ export async function GetFetch() {
 }
 export async function GetTag() {
   try {
-    const response = await axios.get(`http://localhost:3000/api/productAdmin/GetTag`);
+    const response = await axios.get(`${BASE_URL}/api/productAdmin/GetTag`);
     return response.data;
   } catch (error) {
     console.error(`fetchProducts error:`, error);
@@ -22,15 +22,13 @@ export async function GetTag() {
   }
 }
 
-export async function GetProduct(nameProduct?: string, categoryID?: string, brandID?: string[], statusTag?: string, page: number = 1, pageSize: number = 150) {
+export async function GetProduct(nameProduct?: string, categoryID?: string, brandID?: string[], statusTag?: string) {
   try {
-    const response = await axios.post(`http://localhost:3000/api/productAdmin/GetProduct`, {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/GetProduct`, {
       nameProduct,
       categoryID,
       brandID,
       statusTag,
-      page,
-      pageSize,
     });
     return response.data;
   } catch (error) {
@@ -45,7 +43,7 @@ interface AddTagResponse {
 }
 export async function AddTag(newTag: string): Promise<AddTagResponse> {
   try {
-    const response = await axios.post<AddTagResponse>(`http://localhost:3000/api/productAdmin/AddTag`, { newTag });
+    const response = await axios.post<AddTagResponse>(`${BASE_URL}/api/productAdmin/AddTag`, { newTag });
     return response.data;
   } catch (error) {
     console.error(`AddTag error:`, error);
@@ -56,7 +54,7 @@ export async function AddTag(newTag: string): Promise<AddTagResponse> {
 export async function SaveProduct(data: any): Promise<AddTagResponse> {
   try {
     const response = await axios.post<AddTagResponse>(
-      `http://localhost:3000/api/productAdmin/SaveProduct`,
+      `${BASE_URL}/api/productAdmin/SaveProduct`,
       { data }
     );
     return response.data;

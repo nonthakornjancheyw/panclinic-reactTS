@@ -3,7 +3,7 @@ import { debounce } from 'lodash';
 import FeatureToggle from './FeatureToggle'; 
 import { 
   Table, Select, Spin, Row, Layout, Card, 
-  Col, Pagination, Button, Input, Space,
+  Col, Button, Input, Space,
   message, Typography,
 } from 'antd';
 const { Text } = Typography;
@@ -90,6 +90,7 @@ interface ProductRow {
   class: string;
   productID: string;
   productUniqueID: string;
+  mainGroupID:string;
   name: string;
   features: string[];
   dayUse: string;
@@ -137,6 +138,8 @@ const renderSelectCell = <Field extends keyof ProductRow>(
         borderRadius: 4,
         textAlign: isEmpty ? 'left' : 'center',
       }}
+      popupMatchSelectWidth={false}
+      getPopupContainer={() => document.body}
       value={isEmpty ? undefined : currentValue}
       placeholder={
         <span
@@ -148,9 +151,15 @@ const renderSelectCell = <Field extends keyof ProductRow>(
             verticalAlign: 'middle',
             lineHeight: 'normal',
             textAlign: 'left',
+            marginLeft: '8px',
           }}
         />
       }
+      classNames={{
+        popup: {
+          root: 'custom-dayuse-dropdown',
+        },
+      }}
       options={
         (isEmpty ? options.filter((opt) => opt.value !== '0') : options).map((opt) => ({
           value: opt.value,
@@ -161,7 +170,12 @@ const renderSelectCell = <Field extends keyof ProductRow>(
                 color: opt.value ? (disabled ? '#aaa' : '#fff') : '#8D8D8D',
                 textAlign: 'center',
                 borderRadius: 4,
-                padding: '2px 8px',
+                padding: '1px 6px',
+                width: '100%',
+                boxSizing: 'border-box',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               {opt.label}
@@ -183,8 +197,6 @@ const renderSelectCell = <Field extends keyof ProductRow>(
 
 export default function ProductAdminTable() {
   const [spinning, setSpinning] = useState<boolean>(false); // loading 
-  const [currentPage, setCurrentPage] = useState(1); //หน้า
-  const PAGE_SIZE = 50;
   const [categoriesItem, setCategoriesItem] = useState<{rptCategoryID: string; rptCategoryName: string;}[]>([]);//เก็บประเภทcategory
 
   const [allBrands, setAllBrands] = useState<Brand[]>([]); //เก็บbrandทั้งหมด
@@ -228,7 +240,7 @@ export default function ProductAdminTable() {
       setFilteredBrands(transformedBrands); // เริ่มต้นแสดงแบรนด์ทั้งหมด
 
       await fetchTags();
-      handleSearch(1);
+      handleSearch();
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -281,11 +293,11 @@ export default function ProductAdminTable() {
   }, [search.categoryID]);
 
 
-  const handleSearch = async (page = 1) => {
+  const handleSearch = async () => {
     try {
       setSpinning(true)
       const selectedCategoryID = search.categoryID || 'ALL';
-      const response: any = await productApi.GetProduct( search.nameProduct, selectedCategoryID, search.brandID, search.statusTag, page, PAGE_SIZE);
+      const response: any = await productApi.GetProduct( search.nameProduct, selectedCategoryID, search.brandID, search.statusTag);
       const mappedData: ProductRow[] = response.map((item: any) => {
         const tags: string[] = item.TagDetail ? item.TagDetail.split(',').map((tag: string) => tag.trim()) : [];
         const priorities: number[] = item.TagPriority ? item.TagPriority.split(',').map((p: string) => parseInt(p.trim(), 10)) : [];
@@ -302,6 +314,7 @@ export default function ProductAdminTable() {
           categoryID: item.CategoryID,
           brand: item.Brand,
           class: item.Class,
+          mainGroupID: item.MainGroupID,
           productID: item.ProductID,
           productUniqueID: item.ProductUniqueID,
           name: item.Name,
@@ -322,154 +335,138 @@ export default function ProductAdminTable() {
       setSpinning(false);
     }
   };
+
   const handleSave = async () => {
     try {
-      setSpinning(true)
-      const changedItems = data
-        .map(function (currentItem) {
-          const originalItem = originalData.find(function (o) {
-            return o.key === currentItem.key;
-          });
-          if (!originalItem) return null;
+      setSpinning(true);
 
-          // ========== Features ==========
-          const originalTags = originalItem.features || [];
-          const currentTags = currentItem.features || [];
-          const originalSet = new Set(originalTags);
+      const diffList = data.map((currentItem) => {
+        const originalItem = originalData.find((o) => o.key === currentItem.key);
+        if (!originalItem) return null;
 
-          const tagsWithStatus = currentTags.map(function (tagName, index) {
-            const newPriority = index + 1;
-            const oldIndex = originalTags.indexOf(tagName);
-            const oldPriority = oldIndex + 1;
+        const originalTags = originalItem.features || [];
+        const currentTags = currentItem.features || [];
+        const originalSet = new Set(originalTags);
 
-            const tagOption = tagOptions.find(function (t) {
-              return t.label === tagName;
-            });
-            const tagID = tagOption ? tagOption.value : '';
+        const tagsWithStatus = currentTags.map((tagName: string, index: number) => {
+          const newPriority = index + 1;
+          const oldIndex = originalTags.indexOf(tagName);
+          const oldPriority = oldIndex + 1;
 
-            if (!originalSet.has(tagName)) {
-              return { tagID, tagName, tagStatus: 'Add', priority: newPriority };
-            }
+          const tagOption = tagOptions.find((t) => t.label === tagName);
+          const tagID = tagOption ? tagOption.value : '';
 
-            return {
-              tagID,
-              tagName,
-              tagStatus: oldPriority === newPriority ? 'Unchanged' : 'Reorder',
-              priority: newPriority,
-            };
-          });
-
-          const deleteTags = originalTags
-            .filter(function (tagName) {
-              return !currentTags.includes(tagName);
-            })
-            .map(function (tagName) {
-              const tagOption = tagOptions.find(function (t) {
-                return t.label === tagName;
-              });
-              const tagID = tagOption ? tagOption.value : '';
-              return { tagID, tagName, tagStatus: 'Delete', priority: 0 };
-            });
-
-          const allTagChanges = [...tagsWithStatus, ...deleteTags];
-          const isTagChanged = allTagChanges.some(function (t) {
-            return t.tagStatus !== 'Unchanged';
-          });
-
-          // ========== dayUse ==========
-          const originalDayUse = parseInt(originalItem.dayUse || '0', 10);
-          const currentDayUse = parseInt(currentItem.dayUse || '0', 10);
-          const isDayUseChanged = originalDayUse !== currentDayUse;
-
-          const dayUse = {
-            productID: currentItem.productID,
-            status: isDayUseChanged ? 'Change' : 'Unchange',
-            value: currentDayUse,
-          };
-
-          // ========== frequency ==========
-          const originalFrequency = parseInt(originalItem.frequency || '0', 10); 
-          const currentFrequency = parseInt(currentItem.frequency || '0', 10);
-          const isFrequencyChanged = originalFrequency !== currentFrequency;
-
-          const frequency = {
-            productID: currentItem.productID,
-            status: isFrequencyChanged ? 'Change' : 'Unchange',
-            value: currentFrequency,
-          };
-
-
-          // ========== productGroup ==========
-
-
-          // ========== time ==========
-          const originalTime = parseInt(originalItem.time || '0', 10);
-          const currentTime = parseInt(currentItem.time || '0', 10);
-          const isTimeChanged = originalTime !== currentTime;
-
-          const time = {
-            productID: currentItem.productID,
-            status: isTimeChanged ? 'Change' : 'Unchange',
-            value: currentTime,
-          };
-
-          const isSomethingChanged = isTagChanged || isDayUseChanged ||isFrequencyChanged || isTimeChanged;
-
-          if (isSomethingChanged) {
-            return {
-              ...currentItem,
-              features: allTagChanges,
-              dayUse: [dayUse],
-              frequency: [frequency],
-
-              time: [time],
-            };
+          if (!originalSet.has(tagName)) {
+            return { tagID, tagName, tagStatus: 'Add', priority: newPriority };
           }
 
-          return null;
-        })
-        .filter((item): item is Exclude<typeof item, null> => item !== null);
-
-      // ======= Group by productUniqueID =======
-      const groupedByUniqueID: Record<string, any> = {};
-
-      changedItems.forEach(function (item) {
-        const uniqueID = item.productUniqueID;
-
-        if (!groupedByUniqueID[uniqueID]) {
-          groupedByUniqueID[uniqueID] = {
-            ...item,
-            productID: [item.productID],
-            dayUse: [...item.dayUse],
-            productGroup: [...item.productGroup],
+          return {
+            tagID,
+            tagName,
+            tagStatus: oldPriority === newPriority ? 'Unchanged' : 'Reorder',
+            priority: newPriority,
           };
-        } else {
-          groupedByUniqueID[uniqueID].productID.push(item.productID);
-          groupedByUniqueID[uniqueID].dayUse.push(...item.dayUse);
-          groupedByUniqueID[uniqueID].productGroup.push(...item.productGroup);
-          groupedByUniqueID[uniqueID].features.push(...item.features);
-        }
+        });
+
+        const deleteTags = originalTags
+          .filter((tagName: string) => !currentTags.includes(tagName))
+          .map((tagName: string) => {
+            const tagOption = tagOptions.find((t) => t.label === tagName);
+            const tagID = tagOption ? tagOption.value : '';
+            return { tagID, tagName, tagStatus: 'Delete', priority: 0 };
+          });
+
+        const allTagChanges = [...tagsWithStatus, ...deleteTags];
+        const isTagChanged = allTagChanges.some((t) => t.tagStatus !== 'Unchanged');
+
+        const originalDayUse = parseInt(originalItem.dayUse || '0', 10);
+        const currentDayUse = parseInt(currentItem.dayUse || '0', 10);
+        const isDayUseChanged = originalDayUse !== currentDayUse;
+        const dayUse = {
+          productID: currentItem.productID,
+          status: isDayUseChanged ? 'Change' : 'Unchange',
+          value: currentDayUse,
+        };
+
+        const originalFrequency = parseInt(originalItem.frequency || '0', 10);
+        const currentFrequency = parseInt(currentItem.frequency || '0', 10);
+        const isFrequencyChanged = originalFrequency !== currentFrequency;
+        const frequency = {
+          productID: currentItem.productID,
+          mainGroupID: currentItem.mainGroupID, 
+          status: isFrequencyChanged ? 'Change' : 'Unchange',
+          value: currentFrequency,
+        };
+
+        const originalTime = parseInt(originalItem.time || '0', 10);
+        const currentTime = parseInt(currentItem.time || '0', 10);
+        const isTimeChanged = originalTime !== currentTime;
+        const time = {
+          productID: currentItem.productID,
+          mainGroupID: currentItem.mainGroupID,
+          status: isTimeChanged ? 'Change' : 'Unchange',
+          value: currentTime,
+        };
+
+        const isSomethingChanged =
+          isTagChanged || isDayUseChanged || isFrequencyChanged || isTimeChanged;
+
+        return {
+          ...currentItem,
+          isSomethingChanged,
+          features: allTagChanges,
+          dayUse: [dayUse],
+          frequency: [frequency],
+          time: [time],
+        };
+      }).filter((item): item is Exclude<typeof item, null> => item !== null);
+
+      const groupedByUniqueID: Record<string, typeof diffList> = {};
+      diffList.forEach((item) => {
+        const uid = item.productUniqueID;
+        if (!groupedByUniqueID[uid]) groupedByUniqueID[uid] = [];
+        groupedByUniqueID[uid].push(item);
       });
 
-      const finalChangedItems = Object.values(groupedByUniqueID);
+      const finalChangedItems = Object.values(groupedByUniqueID).flatMap((group) => {
+        const isGroupChanged = group.some((i) => i.isSomethingChanged);
+        if (!isGroupChanged) return [];
+
+        const base = {
+          productUniqueID: group[0].productUniqueID,
+          productID: group.map((i) => i.productID),
+          dayUse: group.flatMap((i) => i.dayUse),
+          frequency: group.flatMap((i) => i.frequency),
+          time: group.flatMap((i) => i.time),
+          features: group.flatMap((i) => i.features),
+        };
+
+        return [base];
+      });
+
       if (finalChangedItems.length === 0) {
         setSpinning(false);
         return;
       }
+
+      console.log('รายการที่เปลี่ยนแปลงทั้งหมด:', finalChangedItems);
+      // setSpinning(false);
       const saveResult = await productApi.SaveProduct(finalChangedItems);
       if (!saveResult.success) {
         message.error('บันทึกล้มเหลวจากเซิร์ฟเวอร์');
-        setSpinning(false)
+        setSpinning(false);
         return;
       }
       message.success('บันทึกเรียบร้อยแล้ว');
-      handleSearch(currentPage);
-      console.log('รายการที่เปลี่ยนแปลงทั้งหมด:', finalChangedItems);
+      handleSearch();
     } catch (error) {
       console.error('เกิดข้อผิดพลาดขณะบันทึก:', error);
       message.error('บันทึกล้มเหลว');
     }
   };
+  
+
+
 
 
   const handleNameChange = debounce((val) => {
@@ -482,12 +479,36 @@ export default function ProductAdminTable() {
     field: Field,
     value: ProductRow[Field]
   ) => {
-    setData((prev) =>
-      prev.map((item) =>
-        item.key === key ? { ...item, [field]: value } : item
-      )
-    );
+    setData((prev) => {
+      const target = prev.find((item) => item.key === key);
+      if (!target) return prev;
+
+      const shouldSyncGroup =
+        target.categoryID === '03' &&
+        target.mainGroupID === '18' &&
+        (field === 'frequency' || field === 'time');
+
+      return prev.map((item) => {
+        const isSameGroup =
+          item.productUniqueID === target.productUniqueID &&
+          item.categoryID === '03' &&
+          item.mainGroupID === '18';
+
+        if (shouldSyncGroup && isSameGroup) {
+          return {
+            ...item,
+            [field]: value,
+          };
+        }
+
+        return item.key === key
+          ? { ...item, [field]: value }
+          : item;
+      });
+    });
   };
+
+
 
   const handleFilterName = (confirm: FilterDropdownProps['confirm'],) => { confirm(); };
 
@@ -551,12 +572,14 @@ export default function ProductAdminTable() {
       dataIndex: 'index',
       width: 50,
       align: 'center',
+      fixed: 'left',
       render: (_, __, index) => index + 1,
     },
     {
       title: 'Product Name',
       dataIndex: 'name',
-      width: 410,
+      width: 485,
+      fixed: 'left',
       ...getColumnSearchProps('name'),
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: function (text) {
@@ -567,18 +590,25 @@ export default function ProductAdminTable() {
         );
       }
     },
-    // {
-    //   title: 'Product',
-    //   dataIndex: 'productID',
-    //   width: 60,
-    //   align: 'center',
-    // },
-    // {
-    //   title: 'Unique',
-    //   dataIndex: 'productUniqueID',
-    //   width: 60,
-    //   align: 'center',
-    // },
+    {
+      title: 'Product',
+      dataIndex: 'productID',
+      width: 60,
+      align: 'center',
+    },
+    
+    {
+      title: 'Main',
+      dataIndex: 'mainGroupID',
+      width: 60,
+      align: 'center',
+    },
+    {
+      title: 'Unique',
+      dataIndex: 'productUniqueID',
+      width: 60,
+      align: 'center',
+    },
     {
       title: 'Class',
       dataIndex: 'class',
@@ -586,9 +616,15 @@ export default function ProductAdminTable() {
       sorter: (a, b) => a.class.localeCompare(b.class),
     },
     {
+      title: 'Brand',
+      dataIndex: 'brand',
+      width: 100,
+      sorter: (a, b) => a.brand.localeCompare(b.brand),
+    },
+    {
       title: 'ProductFeature',
       dataIndex: 'features',
-      width: 400,
+      width: 450,
       sorter: (a, b) => b.features.length - a.features.length,
       render: (features: string[] | undefined, record) => (
         <FeatureToggle
@@ -621,7 +657,7 @@ export default function ProductAdminTable() {
     {
       title: 'DayUse',
       dataIndex: 'dayUse',
-      width: 120,
+      width: 80,
       className: "custom-select-ant",
       sorter: (a, b) => {
         const aVal = parseInt(a.dayUse || '0', 10);
@@ -636,18 +672,22 @@ export default function ProductAdminTable() {
     {
       title: 'Frequency',
       dataIndex: 'frequency',
-      width: 120,
+      width: 80,
       className: "custom-select-ant",
       sorter: (a, b) => a.frequency.localeCompare(b.frequency),
       render: (value, record) => {
-        const disabled = !(record.categoryID === '03' || record.categoryID === '04'); // แก้ไขได้แค่ 03,04
+        const disabled = !(
+          (record.categoryID === '03' && record.mainGroupID === '18') ||
+          record.categoryID === '04'
+        ); // แก้ไขได้แค่ 03(mainGroupID=18),04
+
         return renderSelectCell('' + value, record, frequencyOptions, 'frequency', handleChange, disabled);
       }
     },
     {
       title: 'ProductGroup',
       dataIndex: 'productGroup',
-      width: 160,
+      width: 120,
       className: "custom-select-ant",
       sorter: (a, b) => a.productGroup.localeCompare(b.productGroup),
       render: (value, record) =>
@@ -656,7 +696,7 @@ export default function ProductAdminTable() {
     {
       title: 'Time',
       dataIndex: 'time',
-      width: 120,
+      width: 80,
       className: "custom-select-ant",
       sorter: (a, b) => {
         const aVal = parseInt(a.time || '0', 10);
@@ -669,9 +709,26 @@ export default function ProductAdminTable() {
       }
     },
   ];
+  const [tableHeight, setTableHeight] = useState(300);
+
+  // คำนวณความสูงแบบ dynamic
+  useEffect(function () {
+    function calculateTableHeight() {
+      const totalVH = window.innerHeight; // ความสูงจริงของ viewport (DPI แล้ว)
+      const fixedTop = 250; // ความสูงของส่วนบน ๆ เช่น filter, ปุ่ม, margin ฯลฯ
+      const fixedBottom = 70; // เผื่อ Pagination + padding
+      const newHeight = totalVH - fixedTop - fixedBottom;
+
+      setTableHeight(newHeight > 100 ? newHeight : 100); // กันตารางเล็กเกิน
+    }
+
+    calculateTableHeight();
+    window.addEventListener('resize', calculateTableHeight);
+    return () => window.removeEventListener('resize', calculateTableHeight);
+  }, []);
 
   return (
-    <Layout style={{ padding: 10 }}>
+    <Layout style={{ padding: 10}}>
       <Content>
         <Card style={{ height: 'calc(95vh - 75px)', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)', }}>         
           <Row gutter={[8, 0]} style={{ marginBottom: 15 }}>
@@ -759,8 +816,7 @@ export default function ProductAdminTable() {
               <Button
                 icon={<SearchOutlined />}
                 onClick={() => {
-                  setCurrentPage(1);
-                  handleSearch(1);
+                  handleSearch();
                 }}
                 type="primary"
               >
@@ -788,13 +844,20 @@ export default function ProductAdminTable() {
               columns={columns}
               dataSource={data}
               rowKey="key"
-              pagination={false}
-              scroll={{ y: 120 * 5 }}
+              pagination={{
+                pageSize: 50,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showQuickJumper: true,
+                showTotal: (total, range) => `${range[0]}-${range[1]} จากทั้งหมด ${total} รายการ`,
+              }}
+
+              scroll={{ y: tableHeight }}
               style={{ marginBottom: 10 }}
               className="custom-small-table" 
             />
           </Row>
-          <Pagination
+          {/* <Pagination
             align="end"
             current={currentPage}
             pageSize={50}               // หน้า 1 มี 150 รายการ
@@ -804,7 +867,7 @@ export default function ProductAdminTable() {
               setCurrentPage(page);     // บันทึกว่าอยู่หน้าที่เท่าไหร่
               handleSearch(page);       // ไปค้นหาใหม่ โดยส่ง page ไป
             }}
-          />
+          /> */}
         </Card>
         {/* <Spin spinning={spinning} fullscreen /> */}
         {spinning && (
