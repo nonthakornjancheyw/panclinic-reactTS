@@ -5,11 +5,12 @@ import {
   Table, Select, Spin, Row, Layout, Card, 
   Col, Button, Input, Space,
   message, Typography,
+  Tooltip,
 } from 'antd';
 const { Text } = Typography;
 import type { InputRef, TableColumnType } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { SearchOutlined, SaveOutlined } from '@ant-design/icons';
+import { SearchOutlined, SaveOutlined, SettingOutlined  } from '@ant-design/icons';
 import type { FilterDropdownProps } from 'antd/es/table/interface';
 import * as productApi from './productApi';
 import './style.css';
@@ -47,11 +48,11 @@ const frequencyOptions = [
 ];
 
 
-const productGroupOptions = [
-  { label: 'AHA', value: 'AHA', color: '#69c0ff' },
-  { label: 'Sun Screen', value: 'Sun Screen', color: '#ff9c6e' },
-  { label: 'Anti Aging', value: 'Anti Aging', color: '#b37feb' },
-];
+// const productGroupOptions = [
+//   { label: 'AHA', value: 'AHA', color: '#69c0ff' },
+//   { label: 'Sun Screen', value: 'Sun Screen', color: '#ff9c6e' },
+//   { label: 'Anti Aging', value: 'Anti Aging', color: '#b37feb' },
+// ];
 
 const timeOptions = [
   { label: '-', value: '0', color: '#d9d9d9' },
@@ -87,6 +88,8 @@ interface ProductRow {
   key: string;
   categoryID: string;
   brand: string;
+  rptclassID: string;
+  rptclassName: string;
   class: string;
   productID: string;
   productUniqueID: string;
@@ -157,7 +160,7 @@ const renderSelectCell = <Field extends keyof ProductRow>(
       }
       classNames={{
         popup: {
-          root: 'custom-dayuse-dropdown',
+          root: 'custom-color-dropdown',
         },
       }}
       options={
@@ -202,14 +205,15 @@ export default function ProductAdminTable() {
   const [allBrands, setAllBrands] = useState<Brand[]>([]); //เก็บbrandทั้งหมด
   const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]); // เอาไว้ bind Select
 
-  // const [tagColors, setTagColors] = React.useState<Record<string, string>>({});
   const [tagOptions, setTagOptions] = React.useState<TagOption[]>([]); //เก็บ tag 
+  const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
 
   const [search, setSearch] = useState({
     nameProduct: '',
     categoryID: undefined as string | undefined,
     brandID: [] as string[],
     statusTag: undefined as string | undefined,
+    classID: '',
   });
 
   const [data, setData] = useState<ProductRow[]>([]);
@@ -221,7 +225,6 @@ export default function ProductAdminTable() {
       const data = await productApi.GetFetch() as {
         category: { rptCategoryID: string; rptCategoryName: string }[];
         brand: { CategoryID: string; CategoryName: string; BrandID: string; BrandName: string; CategoryOrder: number }[];
-        tag: { TagID: string; TagName: string }[];
       };
 
       // เก็บประเภท
@@ -240,6 +243,7 @@ export default function ProductAdminTable() {
       setFilteredBrands(transformedBrands); // เริ่มต้นแสดงแบรนด์ทั้งหมด
 
       await fetchTags();
+      await fetchClass();
       handleSearch();
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -267,13 +271,22 @@ export default function ProductAdminTable() {
   };
 
   const handleAddNewTag = async (newTag: string) => {
-    const res = await productApi.AddTag(newTag);
+    const res = await productApi.AddTag(newTag) as any;
     if (res.success) {
       await fetchTags();
+      message.success(`เพิ่ม Tag "${res.tagName}" สำเร็จ`);
       return true;
+    } 
+    
+    if (res.error === 'duplicate') {
+      await fetchTags();
+      message.warning(`Tag "${newTag}" มีอยู่แล้ว`);
+      return false;
     }
+    message.error(res.message || 'เกิดข้อผิดพลาดในการเพิ่ม Tag');
     return false;
   };
+
 
   useEffect(() => {
     fetchData();
@@ -313,6 +326,8 @@ export default function ProductAdminTable() {
           key: item.ProductID,
           categoryID: item.CategoryID,
           brand: item.Brand,
+          rptclassID: item.rptClassID,
+          rptclassName: item.rptClassName,
           class: item.Class,
           mainGroupID: item.MainGroupID,
           productID: item.ProductID,
@@ -407,9 +422,22 @@ export default function ProductAdminTable() {
           status: isTimeChanged ? 'Change' : 'Unchange',
           value: currentTime,
         };
+        // =========================
+        // ตรวจสอบการเปลี่ยน Class
+        // =========================
+        const originalClassID = originalItem.rptclassID || '';
+        const currentClassID = currentItem.rptclassID || '';
+        const isClassChanged = originalClassID !== currentClassID;
+
+        const classData = {
+          productID: currentItem.productID,
+          status: isClassChanged ? 'Change' : 'Unchange',
+          rptClassID: currentClassID,
+          rptClassName: classOptions.find(c => c.value === currentClassID)?.label || ''
+        };
 
         const isSomethingChanged =
-          isTagChanged || isDayUseChanged || isFrequencyChanged || isTimeChanged;
+          isTagChanged || isDayUseChanged || isFrequencyChanged || isTimeChanged || isClassChanged;
 
         return {
           ...currentItem,
@@ -418,6 +446,7 @@ export default function ProductAdminTable() {
           dayUse: [dayUse],
           frequency: [frequency],
           time: [time],
+          classData: [classData],
         };
       }).filter((item): item is Exclude<typeof item, null> => item !== null);
 
@@ -438,6 +467,7 @@ export default function ProductAdminTable() {
           dayUse: group.flatMap((i) => i.dayUse),
           frequency: group.flatMap((i) => i.frequency),
           time: group.flatMap((i) => i.time),
+          classData: group.flatMap((i) => i.classData),
           features: group.flatMap((i) => i.features),
         };
 
@@ -566,6 +596,123 @@ export default function ProductAdminTable() {
     render: (text) => <span>{text}</span>, // ❌ ไม่ใช้ Highlighter แล้ว
   });
 
+
+  const fetchClass = async () => {
+    try{
+      const getClass = await productApi.GetClass() as {
+        class: { rptClassID: string; rptClassName: string }[];
+      };
+
+      const options = [
+        { label: "", value: "" }, // ตัวเลือกว่าง
+        ...getClass.class.map(cls => ({
+          label: cls.rptClassName,
+          value: cls.rptClassID,
+        })),
+      ];
+
+      setClassOptions(options);
+    }
+    catch{
+
+    }
+  };
+
+
+  const handleAddNewClass = async (newClass: string) => {
+    const res = await productApi.AddClass(newClass) as any;
+    if (res.success) {
+      await fetchClass();
+      message.success(`เพิ่ม Class ${res.rptClassName} สำเร็จ`);
+      return true;
+    }
+    if (res.error === 'duplicate') {
+      await fetchClass();
+      message.warning(`Class "${newClass}" มีอยู่แล้ว`);
+      return false;
+    }
+    message.error(res.message || 'เกิดข้อผิดพลาดในการเพิ่ม Class');
+    return false;
+  };
+
+
+  const getAddClassOptionProps = () => {
+    const dropdownContent = () => {
+      const [value, setValue] = useState('');
+
+      const trimmed = value.trim();
+      const exists = classOptions.some(
+        (item) => item.label.toLowerCase() === trimmed.toLowerCase()
+      );
+      const canAdd = trimmed !== '' && !exists;
+
+      const filteredOptions = classOptions.filter((item) =>
+        item.label.toLowerCase().includes(trimmed.toLowerCase())
+      );
+
+      const handleAdd = async () => {
+        if (canAdd) {
+          const ok = await handleAddNewClass(trimmed);
+          if (ok) {
+            setValue('');
+          }
+        }
+      };
+
+      return (
+        <div style={{ padding: 8, width: 250 }}>
+          <Input
+            placeholder="Add rptClass"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onPressEnter={handleAdd}
+            style={{ marginBottom: 8 }}
+          />
+          <Button
+            type="primary"
+            block
+            disabled={!canAdd}
+            onClick={handleAdd}
+            style={{ marginBottom: 8 }}
+          >
+            Add
+          </Button>
+
+          <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '4px 8px',
+                    borderBottom: '1px solid #f0f0f0',
+                    backgroundColor:
+                      trimmed !== '' &&
+                      item.label.toLowerCase() === trimmed.toLowerCase()
+                        ? '#ffecec'
+                        : 'transparent',
+                  }}
+                >
+                  {item.label}
+                </div>
+              ))
+            ) : (
+              <div style={{ color: '#999', padding: '4px 8px' }}>No matches</div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    return {
+      filterDropdown: dropdownContent,
+      filterIcon: () => <SettingOutlined />,
+    };
+  };
+
+
+
+
   const columns: ColumnsType<ProductRow> = [
     {
       title: 'No.',
@@ -590,25 +737,31 @@ export default function ProductAdminTable() {
         );
       }
     },
-    {
-      title: 'Product',
-      dataIndex: 'productID',
-      width: 60,
-      align: 'center',
-    },
+    // {
+    //   title: 'Product',
+    //   dataIndex: 'productID',
+    //   width: 60,
+    //   align: 'center',
+    // },
     
-    {
-      title: 'Main',
-      dataIndex: 'mainGroupID',
-      width: 60,
-      align: 'center',
-    },
-    {
-      title: 'Unique',
-      dataIndex: 'productUniqueID',
-      width: 60,
-      align: 'center',
-    },
+    // {
+    //   title: 'Main',
+    //   dataIndex: 'mainGroupID',
+    //   width: 60,
+    //   align: 'center',
+    // },
+    // {
+    //   title: 'Unique',
+    //   dataIndex: 'productUniqueID',
+    //   width: 60,
+    //   align: 'center',
+    // },
+    // {
+    //   title: 'Brand',
+    //   dataIndex: 'brand',
+    //   width: 100,
+    //   sorter: (a, b) => a.brand.localeCompare(b.brand),
+    // },
     {
       title: 'Class',
       dataIndex: 'class',
@@ -616,10 +769,35 @@ export default function ProductAdminTable() {
       sorter: (a, b) => a.class.localeCompare(b.class),
     },
     {
-      title: 'Brand',
-      dataIndex: 'brand',
+      title: 'rptClass',
+      dataIndex: 'rptclassID',
+      className: "custom-select-ant",
       width: 100,
-      sorter: (a, b) => a.brand.localeCompare(b.brand),
+      sorter: (a, b) => a.rptclassID.localeCompare(b.rptclassID),
+      ...getAddClassOptionProps(),
+      render: (value: string, record: ProductRow) => {
+        return (
+          <Select
+            value={value || undefined}
+            onChange={(selectedValue) => {
+              setData((prev) =>
+                prev.map((item) =>
+                  item.productUniqueID === record.productUniqueID
+                    ? { ...item, rptclassID: selectedValue }
+                    : item
+                )
+              );
+            }}
+            style={{ width: '100%' }}
+            popupMatchSelectWidth={false} 
+            options={classOptions.map((item) => ({
+              label: <Tooltip title={item.label}>{item.label}</Tooltip>,
+              value: item.value,
+            }))}
+
+          />
+        );
+      }
     },
     {
       title: 'ProductFeature',
@@ -672,7 +850,7 @@ export default function ProductAdminTable() {
     {
       title: 'Frequency',
       dataIndex: 'frequency',
-      width: 80,
+      width: 120,
       className: "custom-select-ant",
       sorter: (a, b) => a.frequency.localeCompare(b.frequency),
       render: (value, record) => {
@@ -683,15 +861,6 @@ export default function ProductAdminTable() {
 
         return renderSelectCell('' + value, record, frequencyOptions, 'frequency', handleChange, disabled);
       }
-    },
-    {
-      title: 'ProductGroup',
-      dataIndex: 'productGroup',
-      width: 120,
-      className: "custom-select-ant",
-      sorter: (a, b) => a.productGroup.localeCompare(b.productGroup),
-      render: (value, record) =>
-        renderSelectCell('' + value, record, productGroupOptions, 'productGroup', handleChange),
     },
     {
       title: 'Time',
@@ -709,35 +878,63 @@ export default function ProductAdminTable() {
       }
     },
   ];
-  const [tableHeight, setTableHeight] = useState(300);
 
+  
+  const [tableHeight, setTableHeight] = useState(300);
+  const [isZoomed, setIsZoomed] = useState(false);
   // คำนวณความสูงแบบ dynamic
   useEffect(function () {
     function calculateTableHeight() {
-      const totalVH = window.innerHeight; // ความสูงจริงของ viewport (DPI แล้ว)
-      const fixedTop = 250; // ความสูงของส่วนบน ๆ เช่น filter, ปุ่ม, margin ฯลฯ
-      const fixedBottom = 70; // เผื่อ Pagination + padding
-      const newHeight = totalVH - fixedTop - fixedBottom;
+      const totalVH = window.innerHeight;
+      const fixedTop = 250;
+      const fixedBottom = 70;
+      const ratio = window.devicePixelRatio || 1;
 
-      setTableHeight(newHeight > 100 ? newHeight : 100); // กันตารางเล็กเกิน
+      let newHeight = totalVH - fixedTop - fixedBottom;
+
+      // ✅ ถ้า scale 125% (หรือมากกว่า), เพิ่มความสูงให้อีกนิด
+      if (ratio > 1.1) {
+        newHeight += 100;
+      }
+
+      setTableHeight(newHeight > 100 ? newHeight : 100);
+    }
+
+
+    function detectZoomScale() {
+      const ratio = window.devicePixelRatio || 1;
+      setIsZoomed(ratio > 1.1); // ✅ ถ้า scale มากกว่า 110% ถือว่า zoomed
     }
 
     calculateTableHeight();
+    detectZoomScale();
+
     window.addEventListener('resize', calculateTableHeight);
-    return () => window.removeEventListener('resize', calculateTableHeight);
+    window.addEventListener('resize', detectZoomScale);
+
+    return () => {
+      window.removeEventListener('resize', calculateTableHeight);
+      window.removeEventListener('resize', detectZoomScale);
+    };
   }, []);
 
   return (
-    <Layout style={{ padding: 10}}>
+    <Layout style={{ padding: 0}}>
       <Content>
-        <Card style={{ height: 'calc(95vh - 75px)', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)', }}>         
-          <Row gutter={[8, 0]} style={{ marginBottom: 15 }}>
+        <Card
+          style={{
+            minHeight: 'calc(95vh - 75px)',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)', 
+          }}
+        >
+          <Row gutter={[8, 0]} style={{ marginBottom: 15 }} className={`custom-small-table ${isZoomed ? 'zoomable-table' : ''}`}>
             <Col style={{ display: 'flex', flexDirection: 'column' }}>
               <Text strong>ชื่อสินค้า</Text>
               <Input
                 placeholder="ค้นหาชื่อสินค้า"
                 defaultValue={search.nameProduct}
                 onChange={(e) => handleNameChange(e.target.value)}
+                onPressEnter={() => handleSearch()}
                 style={{ width: 200 }}
                 allowClear
               />
@@ -757,6 +954,7 @@ export default function ProductAdminTable() {
                   </Option>
                 ))}
               </Select>
+
             </Col>
 
             <Col style={{ display: 'flex', flexDirection: 'column' }}>
@@ -807,8 +1005,8 @@ export default function ProductAdminTable() {
                 }}
               >
                 <Option value="ALL">ทั้งหมด</Option>
-                <Option value="haveTag">มี Tag</Option>
-                <Option value="noTag">ยังไม่มี Tag</Option>
+                <Option value="Yes">มี Tag</Option>
+                <Option value="No">ยังไม่มี Tag</Option>
               </Select>
             </Col>
 
@@ -854,22 +1052,11 @@ export default function ProductAdminTable() {
 
               scroll={{ y: tableHeight }}
               style={{ marginBottom: 10 }}
-              className="custom-small-table" 
+              className={`custom-small-table ${isZoomed ? 'zoomable-table' : ''}`}
             />
           </Row>
-          {/* <Pagination
-            align="end"
-            current={currentPage}
-            pageSize={50}               // หน้า 1 มี 150 รายการ
-            total={50 * 6}              // บังคับให้มี 6 หน้า (ไม่สนว่า backend มีกี่รายการ)
-            showSizeChanger={false}
-            onChange={(page) => {
-              setCurrentPage(page);     // บันทึกว่าอยู่หน้าที่เท่าไหร่
-              handleSearch(page);       // ไปค้นหาใหม่ โดยส่ง page ไป
-            }}
-          /> */}
+
         </Card>
-        {/* <Spin spinning={spinning} fullscreen /> */}
         {spinning && (
           <div>
             <Spin fullscreen />

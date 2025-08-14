@@ -22,6 +22,16 @@ export async function GetTag() {
   }
 }
 
+export async function GetClass() {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/productAdmin/GetClass`);
+    return response.data;
+  } catch (error) {
+    console.error(`fetchProducts error:`, error);
+    throw error;
+  }
+}
+
 export async function GetProduct(nameProduct?: string, categoryID?: string, brandID?: string[], statusTag?: string) {
   try {
     const response = await axios.post(`${BASE_URL}/api/productAdmin/GetProduct`, {
@@ -38,12 +48,12 @@ export async function GetProduct(nameProduct?: string, categoryID?: string, bran
 }
 
 
-interface AddTagResponse {
+interface StatusResponse {
   success: boolean;
 }
-export async function AddTag(newTag: string): Promise<AddTagResponse> {
+export async function AddTag(newTag: string) {
   try {
-    const response = await axios.post<AddTagResponse>(`${BASE_URL}/api/productAdmin/AddTag`, { newTag });
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddTag`, { newTag });
     return response.data;
   } catch (error) {
     console.error(`AddTag error:`, error);
@@ -51,9 +61,20 @@ export async function AddTag(newTag: string): Promise<AddTagResponse> {
   }
 }
 
-export async function SaveProduct(data: any): Promise<AddTagResponse> {
+export async function AddClass(newClass: string) {
   try {
-    const response = await axios.post<AddTagResponse>(
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddClass`, { newClass });
+    return response.data;
+  } catch (error) {
+    console.error(`AddClass error:`, error);
+    return { success: false };
+  }
+}
+
+
+export async function SaveProduct(data: any): Promise<StatusResponse> {
+  try {
+    const response = await axios.post<StatusResponse>(
       `${BASE_URL}/api/productAdmin/SaveProduct`,
       { data }
     );
