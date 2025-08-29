@@ -22,6 +22,17 @@ export async function GetTag() {
   }
 }
 
+export async function GetOption() {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/productAdmin/GetOption`);
+    return response.data;
+  } catch (error) {
+    console.error(`fetchProducts error:`, error);
+    throw error;
+  }
+}
+
+
 export async function GetClass() {
   try {
     const response = await axios.get(`${BASE_URL}/api/productAdmin/GetClass`);
@@ -61,16 +72,93 @@ export async function AddTag(newTag: string) {
   }
 }
 
-export async function AddClass(newClass: string) {
+export async function AddClass(newClass: string, categoryID?: string) {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddClass`, { newClass });
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddClass`, { newClass, categoryID });
     return response.data;
   } catch (error) {
     console.error(`AddClass error:`, error);
     return { success: false };
   }
 }
+export async function EditClass(rptClassID: string, rptClassName: string, rptCategoryID?: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/EditClass`, { rptClassID, rptClassName, rptCategoryID });
+    return response.data;
+  } catch (error) {
+    console.error(`EditClass error:`, error);
+    return { success: false };
+  }
+}
+export async function DeleteClass(rptClassID: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/DeleteClass`, { rptClassID});
+    return response.data;
+  } catch (error) {
+    console.error(`EditClass error:`, error);
+    return { success: false };
+  }
+}
 
+export async function AddDayUse(DayValue: string, Label: string, Color: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddDayUse`, { DayValue, Label, Color });
+    return response.data;
+  } catch (error) {
+    console.error(`AddDayUse error:`, error);
+    return { success: false };
+  }
+}
+
+export async function EditDayUse(oldDayValue: string, newDayValue: string, Label: string, Color: string)  {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/EditDayUse`, { oldDayValue, newDayValue, Label, Color });
+    return response.data;
+  } catch (error) {
+    console.error(`EditDayUse error:`, error);
+    return { success: false };
+  }
+}
+
+export async function DeleteDayUse(DayValue: string)  {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/DeleteDayUse`, { DayValue });
+    return response.data;
+  } catch (error) {
+    console.error(`DeleteDayUse error:`, error);
+    return { success: false };
+  }
+}
+
+export async function AddFrequency(FrequencyValue: string, Label: string, Color: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddFrequency`, { FrequencyValue, Label, Color });
+    return response.data;
+  } catch (error) {
+    console.error(`AddFrequency error:`, error);
+    return { success: false };
+  }
+}
+
+export async function EditFrequency(oldFrequencyValue: string, newFrequencyValue: string, Label: string, Color: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/EditFrequency`, { oldFrequencyValue, newFrequencyValue, Label, Color });
+    return response.data;
+  } catch (error) {
+    console.error(`EditFrequency error:`, error);
+    return { success: false };
+  }
+}
+
+export async function DeleteFrequency(FrequencyValue: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/DeleteFrequency`, { FrequencyValue });
+    return response.data;
+  } catch (error) {
+    console.error(`DeleteFrequency error:`, error);
+    return { success: false };
+  }
+}
 
 export async function SaveProduct(data: any): Promise<StatusResponse> {
   try {

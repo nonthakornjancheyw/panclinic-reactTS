@@ -3,86 +3,28 @@ import { debounce } from 'lodash';
 import FeatureToggle from './FeatureToggle'; 
 import { 
   Table, Select, Spin, Row, Layout, Card, 
-  Col, Button, Input, Space,
+  Col, Button, Input, Space, Modal,
   message, Typography,
   Tooltip,
 } from 'antd';
 const { Text } = Typography;
 import type { InputRef, TableColumnType } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { SearchOutlined, SaveOutlined, SettingOutlined  } from '@ant-design/icons';
+import { SearchOutlined, SaveOutlined, SettingOutlined, EditOutlined, DeleteOutlined  } from '@ant-design/icons';
 import type { FilterDropdownProps } from 'antd/es/table/interface';
 import * as productApi from './productApi';
 import './style.css';
-
+import { HexColorPicker } from "react-colorful";
+import { createPortal } from 'react-dom';
 // import Highlighter from 'react-highlight-words';
 const { Content } = Layout;
 const { Option } = Select;
 
-const dayUseOptions = [
-  { label: '-', value: '0', color: '#d9d9d9' },
-  { label: '7 Day', value: '7', color: '#37bdfcff' },
-  { label: '14 Day', value: '14', color: '#0fbe98ff' },
-  { label: '15 Day', value: '15', color: '#fd7536ff' },
-  { label: '20 Day', value: '20', color: '#97ce00ff' },
-  { label: '30 Day', value: '30', color: '#ff85c0' },
-  { label: '40 Day', value: '40', color: '#ffd000e8' },
-  { label: '45 Day', value: '45', color: '#c4115bff' },
-  { label: '60 Day', value: '60', color: '#9254de' },
-  { label: '90 Day', value: '90', color: '#de5494ff' },
-  { label: '120 Day', value: '120', color: '#707be0ff' },
-  { label: '180 Day', value: '180', color: '#4f00ceff' },
-];
-
-
-
-const frequencyOptions = [
-  { label: '-', value: '0', color: '#d9d9d9' },
-  { label: '1 Week', value: '1', color: '#02bcd4' },
-  { label: '2 Week', value: '2', color: '#ff4081' },
-  { label: '4 Week', value: '4', color: '#ea80fc' },
-  { label: '5 Week', value: '5', color: '#7c4dff' },
-  { label: '16 Week', value: '16', color: '#f900ea' },
-  { label: '32 Week', value: '32', color: '#af7e2e' },
-  { label: '52 Week', value: '52', color: '#9b59b6' },
-];
-
-
-// const productGroupOptions = [
-//   { label: 'AHA', value: 'AHA', color: '#69c0ff' },
-//   { label: 'Sun Screen', value: 'Sun Screen', color: '#ff9c6e' },
-//   { label: 'Anti Aging', value: 'Anti Aging', color: '#b37feb' },
-// ];
-
-const timeOptions = [
-  { label: '-', value: '0', color: '#d9d9d9' },
-  { label: '5', value: '5', color: '#69c0ff' },
-  { label: '10', value: '10', color: '#ff9c6e' },
-  { label: '15', value: '15', color: '#b37feb' },
-  { label: '20', value: '20', color: '#95de64' },
-  { label: '25', value: '25', color: '#ffd666' },
-  { label: '30', value: '30', color: '#5cdbd3' },
-  { label: '35', value: '35', color: '#ffa39e' },
-  { label: '40', value: '40', color: '#73d13d' },
-  { label: '45', value: '45', color: '#ff85c0' },
-  { label: '50', value: '50', color: '#1b4be9ff' },
-  { label: '60', value: '60', color: '#ffc069' },
-  { label: '70', value: '70', color: '#85a5ff' },
-  { label: '75', value: '75', color: '#ff7875' },
-  { label: '80', value: '80', color: '#36cfc9' },
-  { label: '90', value: '90', color: '#ffc53d' },
-  { label: '100', value: '100', color: '#69c0ff' },
-  { label: '105', value: '105', color: '#ff9c6e' },
-  { label: '110', value: '110', color: '#b37feb' },
-  { label: '120', value: '120', color: '#0fbe98ff' },
-  { label: '140', value: '140', color: '#ffd666' },
-  { label: '150', value: '150', color: '#5cdbd3' },
-  { label: '165', value: '165', color: '#ffa39e' },
-  { label: '180', value: '180', color: '#73d13d' },
-  { label: '240', value: '240', color: '#ff85c0' },
-];
-
-
+type OptionColor = {
+  value: string;  
+  label: string;
+  color: string;
+};
 
 interface ProductRow {
   key: string;
@@ -197,8 +139,11 @@ const renderSelectCell = <Field extends keyof ProductRow>(
   );
 };
 
+interface ProductAdminProps {
+  setHasUnsavedChanges: (fn: () => boolean) => void;
+}
 
-export default function ProductAdminTable() {
+export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdminProps) {
   const [spinning, setSpinning] = useState<boolean>(false); // loading 
   const [categoriesItem, setCategoriesItem] = useState<{rptCategoryID: string; rptCategoryName: string;}[]>([]);//เก็บประเภทcategory
 
@@ -206,7 +151,11 @@ export default function ProductAdminTable() {
   const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]); // เอาไว้ bind Select
 
   const [tagOptions, setTagOptions] = React.useState<TagOption[]>([]); //เก็บ tag 
-  const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
+  const [classOptions, setClassOptions] = useState<{ label: string; value: string; rptCategoryID: string }[]>([]);
+
+  const [dayUseOptions, setDayUseOptions] = useState<OptionColor[]>([]);
+  const [frequencyOptions, setFrequencyOptions] = useState<OptionColor[]>([]);
+  const [timeOptions, setTimeOptions] = useState<OptionColor[]>([]);
 
   const [search, setSearch] = useState({
     nameProduct: '',
@@ -231,7 +180,7 @@ export default function ProductAdminTable() {
       const allItem = { rptCategoryID: 'ALL', rptCategoryName: 'ทั้งหมด' };
       const newData = [allItem, ...data.category];
       setCategoriesItem(newData);
-
+      setSearch(prev => ({ ...prev, categoryID: '01' }));
       // แปลงชื่อ CategoryOrder → rptCategoryOrder (ถ้าต้องการ)
       const transformedBrands = data.brand.map(item => ({
         ...item,
@@ -239,12 +188,20 @@ export default function ProductAdminTable() {
       }));
 
       setAllBrands(transformedBrands);
-      setSearch(prev => ({ ...prev, categoryID: 'ALL' }));
       setFilteredBrands(transformedBrands); // เริ่มต้นแสดงแบรนด์ทั้งหมด
+      const newSearch = {
+        nameProduct: '',
+        categoryID: '01',
+        brandID: ['001'],
+        statusTag: undefined,
+        classID: '',
+      };
 
+      setSearch(newSearch);     // เก็บค่าไว้ใน state
       await fetchTags();
       await fetchClass();
-      handleSearch();
+      await fetchOptions();
+      handleSearch(newSearch);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -268,6 +225,17 @@ export default function ProductAdminTable() {
     }));
 
     setTagOptions(options);
+  };
+
+  const fetchOptions = async () => {
+    const getOption = await productApi.GetOption() as {
+      DayUse: { label: string; value: string; color: string }[];
+      Frequency: { label: string; value: string; color: string }[];
+      Time: { label: string; value: string; color: string }[];
+    };
+    setDayUseOptions(getOption.DayUse);
+    setFrequencyOptions(getOption.Frequency);
+    setTimeOptions(getOption.Time);
   };
 
   const handleAddNewTag = async (newTag: string) => {
@@ -294,29 +262,40 @@ export default function ProductAdminTable() {
 
   useEffect(() => {
     if (search.categoryID === 'ALL') {
-      setFilteredBrands(allBrands); // หรือจะใส่ทุกแบรนด์ก็ได้
+      // แสดงทุก brand และคง brandID เดิมไว้ เพราะ ALL ครอบคลุมทั้งหมด
+      setFilteredBrands(allBrands);
     } else {
       const result = allBrands.filter(function (b) {
         return b.CategoryID === search.categoryID;
       });
       setFilteredBrands(result);
+      const validBrandIDs = search.brandID.filter(function (id) {
+        return result.some(function (b) {
+          return b.BrandID === id;
+        });
+      });
+      setSearch({ ...search, brandID: validBrandIDs });
     }
-    // เคลียร์แบรนด์ที่เลือกอยู่
-    setSearch({ ...search, brandID: [] });
   }, [search.categoryID]);
 
 
-  const handleSearch = async () => {
+
+  const handleSearch = async (params = search) => {
     try {
-      setSpinning(true)
-      const selectedCategoryID = search.categoryID || 'ALL';
-      const response: any = await productApi.GetProduct( search.nameProduct, selectedCategoryID, search.brandID, search.statusTag);
+      setSpinning(true);
+      const selectedCategoryID = params.categoryID || '01';
+      const response: any = await productApi.GetProduct(
+        params.nameProduct,
+        selectedCategoryID,
+        params.brandID,
+        params.statusTag
+      );
+
       const mappedData: ProductRow[] = response.map((item: any) => {
         const tags: string[] = item.TagDetail ? item.TagDetail.split(',').map((tag: string) => tag.trim()) : [];
         const priorities: number[] = item.TagPriority ? item.TagPriority.split(',').map((p: string) => parseInt(p.trim(), 10)) : [];
 
-        const tagWithPriority: { tag: string; priority: number }[] = tags.map((tag: string, idx: number) => ({
-          tag,
+        const tagWithPriority = tags.map((tag, idx) => ({tag,
           priority: priorities[idx] || 999,
         }));
 
@@ -345,11 +324,11 @@ export default function ProductAdminTable() {
       setOriginalData(JSON.parse(JSON.stringify(mappedData)));
     } catch (error) {
       console.error(error);
-    }
-    finally {
+    } finally {
       setSpinning(false);
     }
   };
+
 
   const handleSave = async () => {
     try {
@@ -488,7 +467,7 @@ export default function ProductAdminTable() {
         return;
       }
       message.success('บันทึกเรียบร้อยแล้ว');
-      handleSearch();
+      handleSearch(search)
     } catch (error) {
       console.error('เกิดข้อผิดพลาดขณะบันทึก:', error);
       message.error('บันทึกล้มเหลว');
@@ -598,40 +577,57 @@ export default function ProductAdminTable() {
 
 
   const fetchClass = async () => {
-    try{
-      const getClass = await productApi.GetClass() as {
-        class: { rptClassID: string; rptClassName: string }[];
+    try {
+      const getClass = (await productApi.GetClass()) as {
+        class: { rptClassID: string; rptClassName: string; rptCategoryID: string }[];
       };
 
-      const options = [
-        { label: "", value: "" }, // ตัวเลือกว่าง
-        ...getClass.class.map(cls => ({
-          label: cls.rptClassName,
-          value: cls.rptClassID,
-        })),
-      ];
+      const options = getClass.class.map((cls) => ({
+        label: cls.rptClassName,
+        value: cls.rptClassID,
+        rptCategoryID: cls.rptCategoryID,
+      }));
 
       setClassOptions(options);
-    }
-    catch{
-
+    } catch {
+      // handle error if needed
     }
   };
 
 
-  const handleAddNewClass = async (newClass: string) => {
-    const res = await productApi.AddClass(newClass) as any;
+  useEffect(() => {
+    (window as any).__ALL_PRODUCTS__ = data; // data = state ที่เก็บ product ทั้งหมด
+  }, [data]);
+
+  const handleAddNewClass = async (newClass: string, categoryID?: string) => {
+    const res = await productApi.AddClass(newClass, categoryID) as any;
     if (res.success) {
       await fetchClass();
-      message.success(`เพิ่ม Class ${res.rptClassName} สำเร็จ`);
+      message.success("เพิ่ม Class " + res.rptClassName + " สำเร็จ");
       return true;
     }
-    if (res.error === 'duplicate') {
+    if (res.error === "duplicate") {
       await fetchClass();
-      message.warning(`Class "${newClass}" มีอยู่แล้ว`);
+      message.warning('Class "' + newClass + '" มีอยู่แล้ว');
       return false;
     }
-    message.error(res.message || 'เกิดข้อผิดพลาดในการเพิ่ม Class');
+    message.error(res.message || "เกิดข้อผิดพลาดในการเพิ่ม Class");
+    return false;
+  };
+
+  const handleEditClass = async (rptClassID: string, rptClassName: string, rptCategoryID?: string) => {
+    const res = await productApi.EditClass(rptClassID, rptClassName, rptCategoryID) as any;
+    if (res.success) {
+      await fetchClass();
+      message.success("แก้ไข Class " + res.rptClassName + " สำเร็จ");
+      return true;
+    }
+    if (res.error === "duplicate") {
+      await fetchClass();
+      message.warning('Class "' + rptClassName + '" มีอยู่แล้ว');
+      return false;
+    }
+    message.error(res.message || "เกิดข้อผิดพลาดในการแก้ไข Class");
     return false;
   };
 
@@ -639,85 +635,871 @@ export default function ProductAdminTable() {
   const getAddClassOptionProps = () => {
     const dropdownContent = () => {
       const [value, setValue] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+      const [editItem, setEditItem] = useState<{ classID: string; name: string; categoryID: string } | null>(null);
+      const [deleteItem, setDeleteItem] = useState<typeof classOptions[0] | null>(null);
+
+      // sync default category จาก search.categoryID
+      useEffect(() => {
+        if (search.categoryID && search.categoryID !== "All") {
+          setSelectedCategory(search.categoryID);
+        } else {
+          setSelectedCategory(undefined);
+        }
+      }, [search.categoryID]);
 
       const trimmed = value.trim();
       const exists = classOptions.some(
-        (item) => item.label.toLowerCase() === trimmed.toLowerCase()
+        (item) =>
+          item.label.toLowerCase() === trimmed.toLowerCase() &&
+          item.rptCategoryID === selectedCategory
       );
-      const canAdd = trimmed !== '' && !exists;
 
-      const filteredOptions = classOptions.filter((item) =>
-        item.label.toLowerCase().includes(trimmed.toLowerCase())
-      );
+      const canAdd = trimmed !== '' && !exists && !!selectedCategory;
+
+      const filteredOptions = classOptions
+        .filter(item => item.rptCategoryID === selectedCategory)
+        .filter(item => item.label.toLowerCase().includes(trimmed.toLowerCase()));
 
       const handleAdd = async () => {
-        if (canAdd) {
-          const ok = await handleAddNewClass(trimmed);
+        if (canAdd && selectedCategory) {
+          const ok = await handleAddNewClass(trimmed, selectedCategory);
+          if (ok) setValue('');
+        }
+      };
+
+      // >>> เพิ่ม logic สำหรับ edit
+      const canSaveEdit =
+        editItem !== null &&
+        editItem.name.trim() !== '' &&
+        !classOptions.some(
+          (item) =>
+            item.label.toLowerCase() === editItem.name.trim().toLowerCase() &&
+            item.rptCategoryID === editItem.categoryID &&
+            item.value !== editItem.classID
+        );
+
+      const handleSaveEdit = async () => {
+        if (editItem && canSaveEdit) {
+          const ok = await handleEditClass(editItem.classID, editItem.name.trim(), editItem.categoryID);
           if (ok) {
+            setEditItem(null);
             setValue('');
           }
         }
       };
 
-      return (
-        <div style={{ padding: 8, width: 250 }}>
-          <Input
-            placeholder="Add rptClass"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onPressEnter={handleAdd}
-            style={{ marginBottom: 8 }}
-          />
-          <Button
-            type="primary"
-            block
-            disabled={!canAdd}
-            onClick={handleAdd}
-            style={{ marginBottom: 8 }}
-          >
-            Add
-          </Button>
+      const handleConfirmDelete = async () => {
+        if (!deleteItem) return false;
 
+        console.log("Attempting to delete class:", deleteItem);
+
+        try {
+          const res: any = await productApi.DeleteClass(deleteItem.value);
+
+          console.log("DeleteClass API response:", res);
+
+          if (res.success) {
+            message.success("ลบรายการ " + deleteItem.label + " สำเร็จ");
+          } else {
+            // ตรวจสอบ error เฉพาะ
+            if (res.error === 'inuse') {
+              message.error(
+                `ไม่สามารถลบ Class "${deleteItem.label}" ได้ เนื่องจากยังถูกใช้งานอยู่`
+              );
+            } else if (res.error === 'notfound') {
+              message.error(
+                `ไม่พบ Class "${deleteItem.label}" ในระบบ`
+              );
+            } else if (res.error === 'duplicate') {
+              message.warning(
+                'ลบรายการ "' + deleteItem.label + '" มีอยู่แล้ว'
+              );
+            } else {
+              message.error(res.message || "เกิดข้อผิดพลาดในการลบ");
+            }
+          }
+
+          // อัปเดตข้อมูลใหม่
+          await fetchClass();
+          setDeleteItem(null);
+
+          return res.success;
+        } catch (error) {
+          console.error("DeleteClass unexpected error:", error);
+          message.error("เกิดข้อผิดพลาดไม่คาดคิดในการลบ");
+          return false;
+        }
+      };
+
+
+
+      const filteredCategories = categoriesItem.filter(cat => cat.rptCategoryID !== 'ALL');
+
+      return (
+        <div style={{ padding: 8, width: 400 }}>
+          {/* Label แถวบน */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+            <div style={{ flex: 1, fontWeight: 600 }}>Class</div>
+            <div style={{ width: 140, fontWeight: 600 }}>ประเภท</div>
+            <div style={{ width: 60, fontWeight: 600 }}>Actions</div>
+          </div>
+
+          {/* Input + Select */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <Input
+              placeholder="Add rptClass"
+              value={editItem ? editItem.name : value}
+              onChange={(e) =>
+                editItem
+                  ? setEditItem({ ...editItem, name: e.target.value })
+                  : setValue(e.target.value)
+              }
+              onPressEnter={editItem ? handleSaveEdit : handleAdd}
+              style={{ flex: 1 }}
+            />
+            <Select
+              style={{ width: 140 }}
+              placeholder="กรุณาเลือก Category"
+              value={editItem ? editItem.categoryID : selectedCategory}
+              onChange={(val) =>
+                editItem
+                  ? setEditItem({ ...editItem, categoryID: val })
+                  : setSelectedCategory(val)
+              }
+              options={filteredCategories.map((cat) => ({
+                label: cat.rptCategoryName,
+                value: cat.rptCategoryID,
+              }))}
+              getPopupContainer={() => document.body}
+            />
+          </div>
+
+          {/* ปุ่ม Add / Save */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {editItem ? (
+              <>
+                <Button
+                  variant="solid"
+                  color="green"
+                  block
+                  disabled={!canSaveEdit} // <<< disable ปุ่มถ้า duplicate หรือชื่อว่าง
+                  onClick={handleSaveEdit}
+                >
+                  บันทึกการแก้ไข
+                </Button>
+
+                <Button
+                  variant="filled"
+                  color="orange"
+                  block
+                  style={{
+                    border: '1px solid #ffa940',
+                  }}
+                  onClick={() => {
+                    setEditItem(null);
+                    setValue('');
+                  }}
+                >
+                  ยกเลิก
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="primary"
+                block
+                disabled={!canAdd}
+                onClick={handleAdd}
+                style={{ marginBottom: 8 }}
+              >
+                Add
+              </Button>
+            )}
+          </div>
+
+          {/* รายการตัวเลือก */}
           <div style={{ maxHeight: 150, overflowY: 'auto' }}>
             {filteredOptions.length > 0 ? (
               filteredOptions.map((item, idx) => (
                 <div
                   key={idx}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     padding: '4px 8px',
                     borderBottom: '1px solid #f0f0f0',
-                    backgroundColor:
-                      trimmed !== '' &&
-                      item.label.toLowerCase() === trimmed.toLowerCase()
-                        ? '#ffecec'
-                        : 'transparent',
+                    gap: 8,
                   }}
                 >
-                  {item.label}
+                  <div style={{ flex: 1.5, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    {item.label}
+                  </div>
+                  <div style={{ flexShrink: 0, width: 100, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    {filteredCategories.find(c => c.rptCategoryID === item.rptCategoryID)?.rptCategoryName}
+                  </div>
+                  <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
+                    <Button
+                      color="blue"
+                      variant="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() =>
+                        setEditItem({ classID: item.value, name: item.label, categoryID: item.rptCategoryID })
+                      }
+                    />
+                    <Button
+                      color="red"
+                      variant="text"
+                      type="primary"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => setDeleteItem(item)}
+                    />
+                  </div>
                 </div>
               ))
             ) : (
               <div style={{ color: '#999', padding: '4px 8px' }}>No matches</div>
             )}
           </div>
+
+          {/* Modal Delete */}
+          <Modal
+            open={!!deleteItem}
+            title={
+              <>
+                คุณต้องการลบ Class{" "}
+                <span style={{ color: "red" }}>
+                  "{deleteItem?.label}"
+                </span>{" "}
+                ใช่หรือไม่?
+              </>
+            }
+            onOk={handleConfirmDelete}
+            onCancel={() => setDeleteItem(null)}
+            okText="ลบ"
+            okType="danger"
+            cancelText="ยกเลิก"
+            zIndex={1500}
+            getContainer={document.body}
+          >
+            การลบนี้ไม่สามารถย้อนกลับได้
+          </Modal>
+
         </div>
       );
     };
 
-    return {
-      filterDropdown: dropdownContent,
-      filterIcon: () => <SettingOutlined />,
-    };
+    return { filterDropdown: dropdownContent, filterIcon: () => <SettingOutlined /> };
   };
 
+  const getAddDayUseOptionProps = () => {
+    const dropdownContent = () => {
+      const [value, setValue] = useState('');
+      const [color, setColor] = useState<string>('#69c0ff');
+      const [showPicker, setShowPicker] = useState(false);
+      const [editItem, setEditItem] = useState<OptionColor & { originalValue?: string } | null>(null);
+      const [deleteItem, setDeleteItem] = useState<OptionColor | null>(null);
+      const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+      const colorBtnRef = useRef<HTMLDivElement | null>(null);
 
+      const trimmed = value.trim();
+      const exists = dayUseOptions.some(
+        (item) => item.value === trimmed && (!editItem || item.value !== editItem.value)
+      );
+      const canAdd = trimmed !== '' && /^\d+$/.test(trimmed) && !exists;
+
+      const handleAdd = async () => {
+        if (!canAdd) return;
+        
+        const newOption: OptionColor = {
+          value: trimmed,
+          label: `${trimmed} Day`,
+          color,
+        };
+        const res = await productApi.AddDayUse(trimmed, newOption.label, newOption.color) as any;
+        if (res.success) {
+          await fetchOptions();
+          message.success("เพิ่ม DayUse " + newOption.label + " สำเร็จ");
+          return true;
+        }
+        if (res.error === "duplicate") {
+          await fetchOptions();
+          message.warning('DayUse "' + newOption.label + '" มีอยู่แล้ว');
+          return false;
+        }
+        message.error(res.message || "เกิดข้อผิดพลาดในการเพิ่ม Class");
+        return false;
+      };
+
+      const canSaveEdit =
+      editItem !== null &&
+      editItem.value.trim() !== '' &&
+      /^\d+$/.test(editItem.value) &&
+      !dayUseOptions.some(
+        (item) => item.value === editItem.value && item.value !== editItem.originalValue
+      );
+
+      const handleSaveEdit = async () => {
+          if (!editItem) return;
+
+          const oldDayValue = editItem.originalValue ?? editItem.value; // เก็บค่าเก่าตอนกด edit
+          const newDayValue = editItem.value; // ค่าใหม่จาก input
+          const newLabel = editItem.label;
+          const newColor = editItem.color;
+          console.log("Editing DayUse:", { oldDayValue, newDayValue, newLabel, newColor });
+          // เรียก API
+          const res = await productApi.EditDayUse(oldDayValue, newDayValue, newLabel, newColor) as any;
+
+          if (res.success) {
+            await fetchOptions();
+            message.success("แก้ไข DayUse " + newLabel + " สำเร็จ");
+            setEditItem(null);
+            setValue('');
+            setColor('#69c0ff');
+            return true;
+          }
+
+          if (res.error === 'duplicate') {
+            await fetchOptions();
+            message.warning('DayValue "' + newDayValue + '" มีอยู่แล้ว');
+            return false;
+          }
+          if (res.error === 'notfound') {
+            message.error('ไม่พบ DayValue เก่าในระบบ');
+            return false;
+          }
+          message.error(res.message || 'เกิดข้อผิดพลาดในการแก้ไข DayUse');
+          return false;
+        };
+
+
+      const handleConfirmDelete = async () => {
+        if (!deleteItem) return false;
+
+        try {
+          const res: any = await productApi.DeleteDayUse(deleteItem.value);
+          if (res.success) {
+            message.success(`ลบ DayUse "${deleteItem.label}" สำเร็จ`);
+          } else {
+            if (res.error === 'notfound') {
+              message.error(`ไม่พบ DayUse "${deleteItem.label}" ในระบบ`);
+            } else if (res.error === 'exception') {
+              message.error(`เกิดข้อผิดพลาดในการลบ DayUse "${deleteItem.label}"`);
+            } else {
+              message.error(res.message || `ไม่สามารถลบ DayUse "${deleteItem.label}" ได้`);
+            }
+          }
+          // รีเฟรช options ใหม่
+          await fetchOptions();
+          setDeleteItem(null);
+          return res.success;
+        } catch (error) {
+          console.error("DeleteDayUse unexpected error:", error);
+          message.error(`เกิดข้อผิดพลาดไม่คาดคิดในการลบ DayUse "${deleteItem.label}"`);
+          return false;
+        }
+      };
+
+
+      const togglePicker = () => {
+        if (!showPicker && colorBtnRef.current) {
+          const rect = colorBtnRef.current.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX });
+        }
+        setShowPicker(!showPicker);
+      };
+
+      return (
+        <div style={{ padding: 8, width: 225 }}>
+          {/* Header */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginBottom: 4,
+              fontWeight: 600,
+              alignItems: 'center',
+            }}
+          >
+            <div style={{ flex: 1 }}>Day</div>
+            <div style={{ width: 32 }}>Color</div>
+          </div>
+
+          {/* Input + Color */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginBottom: 8,
+              alignItems: 'center',
+            }}
+          >
+            {/* Input Day */}
+            <Input
+              placeholder="Day"
+              maxLength={3} // รับได้สูงสุด 3 หลัก = 999
+              value={editItem ? editItem.value : value}
+              onChange={(e) => {
+                const newValue = e.target.value.replace(/\D/g, ''); // รับแค่ตัวเลข
+                const newLabel = newValue === '' || newValue === '0' ? '-' : newValue + ' Day';
+
+                if (editItem) {
+                  setEditItem({
+                    ...editItem,
+                    value: newValue,
+                    label: newLabel,
+                  });
+                } else {
+                  setValue(newValue);
+                }
+              }}
+              onPressEnter={editItem ? handleSaveEdit : handleAdd}
+              style={{ flex: 1 }} // ขยายเต็มพื้นที่
+              addonAfter="Day" // แสดง unit ต่อท้าย
+            />
+
+            {/* Color Picker Trigger */}
+            <div style={{ width: 32, position: 'relative' }}>
+              <div
+                ref={colorBtnRef}
+                onClick={togglePicker}
+                style={{
+                  width: '100%',
+                  height: 32,
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  cursor: 'pointer',
+                  background: editItem ? editItem.color : color,
+                }}
+              />
+              {showPicker &&
+                createPortal(
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
+                    {/* Background คลิกปิด */}
+                    <div
+                      onClick={() => setShowPicker(false)}
+                      style={{ position: 'fixed', inset: 0 }}
+                    />
+                    {/* Picker */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: pickerPos.top,
+                        left: pickerPos.left,
+                      }}
+                    >
+                      <HexColorPicker
+                        color={editItem ? editItem.color : color}
+                        onChange={(newColor) =>
+                          editItem
+                            ? setEditItem({ ...editItem, color: newColor })
+                            : setColor(newColor)
+                        }
+                      />
+                    </div>
+                  </div>,
+                  document.body
+                )}
+            </div>
+          </div>
+
+          {/* ปุ่ม Add / Save */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {editItem ? (
+              <>
+                <Button type="primary" block disabled={!canSaveEdit} onClick={handleSaveEdit}>
+                  บันทึกการแก้ไข
+                </Button>
+                <Button
+                  block
+                  onClick={() => {
+                    setEditItem(null);
+                    setValue('');
+                    setColor('#69c0ff');
+                  }}
+                >
+                  ยกเลิก
+                </Button>
+              </>
+            ) : (
+              <Button type="primary" block disabled={!canAdd} onClick={handleAdd}>
+                Add
+              </Button>
+            )}
+          </div>
+
+          {/* รายการตัวเลือก */}
+          <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+            {dayUseOptions.length > 0 ? (
+              dayUseOptions.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    borderBottom: '1px solid #f0f0f0',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>{item.label}</div>
+                  <div style={{ width: 35 }}>
+                    <div
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        background: item.color,
+                        border: '1px solid #ccc',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => setEditItem({ ...item, originalValue: item.value })}
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => setDeleteItem(item)}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ color: '#999', padding: '4px 8px' }}>No options</div>
+            )}
+          </div>
+
+          {/* Modal Delete */}
+          <Modal
+            open={!!deleteItem}
+            title={`คุณต้องการลบ DayUse "${deleteItem?.label}" ใช่หรือไม่?`}
+            onOk={handleConfirmDelete}
+            onCancel={() => setDeleteItem(null)}
+            okText="ลบ"
+            okType="danger"
+            cancelText="ยกเลิก"
+            zIndex={1500}
+            getContainer={document.body}
+          >
+            การลบนี้ไม่สามารถย้อนกลับได้
+          </Modal>
+        </div>
+      );
+    };
+
+    return { filterDropdown: dropdownContent, filterIcon: () => <SettingOutlined /> };
+  };
+
+  const getAddFrequencyOptionProps = () => {
+    const dropdownContent = () => {
+      const [value, setValue] = useState('');
+      const [color, setColor] = useState<string>('#69c0ff');
+      const [showPicker, setShowPicker] = useState(false);
+      const [editItem, setEditItem] = useState<OptionColor & { originalValue?: string } | null>(null);
+      const [deleteItem, setDeleteItem] = useState<OptionColor | null>(null);
+      const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+      const colorBtnRef = useRef<HTMLDivElement | null>(null);
+
+      const trimmed = value.trim();
+      const exists = frequencyOptions.some(
+        (item) => item.value === trimmed && (!editItem || item.value !== editItem.value)
+      );
+      const canAdd = trimmed !== '' && /^\d+$/.test(trimmed) && !exists;
+
+      const handleAdd = async () => {
+        if (!canAdd) return;
+
+        const newOption: OptionColor = {
+          value: trimmed,
+          label: `${trimmed} wk`,
+          color,
+        };
+        const res = await productApi.AddFrequency(trimmed, newOption.label, newOption.color) as any;
+        if (res.success) {
+          await fetchOptions();
+          message.success("เพิ่ม Frequency " + newOption.label + " สำเร็จ");
+          return true;
+        }
+        if (res.error === "duplicate") {
+          await fetchOptions();
+          message.warning('Frequency "' + newOption.label + '" มีอยู่แล้ว');
+          return false;
+        }
+        message.error(res.message || "เกิดข้อผิดพลาดในการเพิ่ม Frequency");
+        return false;
+      };
+
+      const canSaveEdit =
+        editItem !== null &&
+        editItem.value.trim() !== '' &&
+        /^\d+$/.test(editItem.value) &&
+        !frequencyOptions.some(
+          (item) => item.value === editItem.value && item.value !== editItem.originalValue
+        );
+
+      const handleSaveEdit = async () => {
+        if (!editItem) return;
+
+        const oldValue = editItem.originalValue ?? editItem.value;
+        const newValue = editItem.value;
+        const newLabel = editItem.label;
+        const newColor = editItem.color;
+
+        const res = await productApi.EditFrequency(oldValue, newValue, newLabel, newColor) as any;
+
+        if (res.success) {
+          await fetchOptions();
+          message.success("แก้ไข Frequency " + newLabel + " สำเร็จ");
+          setEditItem(null);
+          setValue('');
+          setColor('#69c0ff');
+          return true;
+        }
+
+        if (res.error === 'duplicate') {
+          await fetchOptions();
+          message.warning('Frequency "' + newValue + '" มีอยู่แล้ว');
+          return false;
+        }
+        if (res.error === 'notfound') {
+          message.error('ไม่พบ Frequency เก่าในระบบ');
+          return false;
+        }
+        message.error(res.message || 'เกิดข้อผิดพลาดในการแก้ไข Frequency');
+        return false;
+      };
+
+      const handleConfirmDelete = async () => {
+        if (!deleteItem) return false;
+
+        try {
+          const res: any = await productApi.DeleteFrequency(deleteItem.value);
+          if (res.success) {
+            message.success(`ลบ Frequency "${deleteItem.label}" สำเร็จ`);
+          } else {
+            if (res.error === 'notfound') {
+              message.error(`ไม่พบ Frequency "${deleteItem.label}" ในระบบ`);
+            } else if (res.error === 'exception') {
+              message.error(`เกิดข้อผิดพลาดในการลบ Frequency "${deleteItem.label}"`);
+            } else {
+              message.error(res.message || `ไม่สามารถลบ Frequency "${deleteItem.label}" ได้`);
+            }
+          }
+          await fetchOptions();
+          setDeleteItem(null);
+          return res.success;
+        } catch (error) {
+          console.error("DeleteFrequency unexpected error:", error);
+          message.error(`เกิดข้อผิดพลาดไม่คาดคิดในการลบ Frequency "${deleteItem.label}"`);
+          return false;
+        }
+      };
+
+      const togglePicker = () => {
+        if (!showPicker && colorBtnRef.current) {
+          const rect = colorBtnRef.current.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX });
+        }
+        setShowPicker(!showPicker);
+      };
+
+      return (
+        <div style={{ padding: 8, width: 225 }}>
+          {/* Header */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginBottom: 4,
+              fontWeight: 600,
+              alignItems: 'center',
+            }}
+          >
+            <div style={{ flex: 1 }}>Frequency</div>
+            <div style={{ width: 32 }}>Color</div>
+          </div>
+
+          {/* Input + Color */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginBottom: 8,
+              alignItems: 'center',
+            }}
+          >
+            {/* Input Frequency */}
+            <Input
+              placeholder="Frequency"
+              maxLength={3} // สูงสุด 3 หลัก = 999
+              value={editItem ? editItem.value : value}
+              onChange={(e) => {
+                const newValue = e.target.value.replace(/\D/g, ''); // รับเฉพาะตัวเลข
+                const newLabel = newValue === '' || newValue === '0' ? '-' : newValue + ' wk';
+
+                if (editItem) {
+                  setEditItem({ ...editItem, value: newValue, label: newLabel });
+                } else {
+                  setValue(newValue);
+                }
+              }}
+              onPressEnter={editItem ? handleSaveEdit : handleAdd}
+              style={{ flex: 1 }} // ขยายเต็มพื้นที่
+              addonAfter="wk" // แสดง unit ต่อท้าย
+            />
+
+            {/* Color Picker Trigger */}
+            <div style={{ width: 32, position: 'relative' }}>
+              <div
+                ref={colorBtnRef}
+                onClick={togglePicker}
+                style={{
+                  width: '100%',
+                  height: 32,
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  cursor: 'pointer',
+                  background: editItem ? editItem.color : color,
+                }}
+              />
+              {showPicker &&
+                createPortal(
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
+                    {/* Background คลิกปิด */}
+                    <div
+                      onClick={() => setShowPicker(false)}
+                      style={{ position: 'fixed', inset: 0 }}
+                    />
+                    {/* Picker */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: pickerPos.top,
+                        left: pickerPos.left,
+                      }}
+                    >
+                      <HexColorPicker
+                        color={editItem ? editItem.color : color}
+                        onChange={(newColor) =>
+                          editItem ? setEditItem({ ...editItem, color: newColor }) : setColor(newColor)
+                        }
+                      />
+                    </div>
+                  </div>,
+                  document.body
+                )}
+            </div>
+          </div>
+
+          {/* Add / Save Buttons */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {editItem ? (
+              <>
+                <Button type="primary" block disabled={!canSaveEdit} onClick={handleSaveEdit}>
+                  บันทึกการแก้ไข
+                </Button>
+                <Button
+                  block
+                  onClick={() => {
+                    setEditItem(null);
+                    setValue('');
+                    setColor('#69c0ff');
+                  }}
+                >
+                  ยกเลิก
+                </Button>
+              </>
+            ) : (
+              <Button type="primary" block disabled={!canAdd} onClick={handleAdd}>
+                Add
+              </Button>
+            )}
+          </div>
+
+          {/* List */}
+          <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+            {frequencyOptions.length > 0 ? (
+              frequencyOptions.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    borderBottom: '1px solid #f0f0f0',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>{item.label}</div>
+                  <div style={{ width: 35 }}>
+                    <div
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        background: item.color,
+                        border: '1px solid #ccc',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => setEditItem({ ...item, originalValue: item.value })}
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => setDeleteItem(item)}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ color: '#999', padding: '4px 8px' }}>No options</div>
+            )}
+          </div>
+
+          {/* Delete Modal */}
+          <Modal
+            open={!!deleteItem}
+            title={`คุณต้องการลบ Frequency "${deleteItem?.label}" ใช่หรือไม่?`}
+            onOk={handleConfirmDelete}
+            onCancel={() => setDeleteItem(null)}
+            okText="ลบ"
+            okType="danger"
+            cancelText="ยกเลิก"
+            zIndex={1500}
+            getContainer={document.body}
+          >
+            การลบนี้ไม่สามารถย้อนกลับได้
+          </Modal>
+        </div>
+      );
+    };
+
+    return { filterDropdown: dropdownContent, filterIcon: () => <SettingOutlined /> };
+  };
 
 
   const columns: ColumnsType<ProductRow> = [
     {
       title: 'No.',
       dataIndex: 'index',
-      width: 50,
+      width: 40,
       align: 'center',
       fixed: 'left',
       render: (_, __, index) => index + 1,
@@ -725,7 +1507,7 @@ export default function ProductAdminTable() {
     {
       title: 'Product Name',
       dataIndex: 'name',
-      width: 485,
+      width: 470,
       fixed: 'left',
       ...getColumnSearchProps('name'),
       sorter: (a, b) => a.name.localeCompare(b.name),
@@ -756,12 +1538,12 @@ export default function ProductAdminTable() {
     //   width: 60,
     //   align: 'center',
     // },
-    // {
-    //   title: 'Brand',
-    //   dataIndex: 'brand',
-    //   width: 100,
-    //   sorter: (a, b) => a.brand.localeCompare(b.brand),
-    // },
+    {
+      title: 'กลุ่ม',
+      dataIndex: 'brand',
+      width: 100,
+      sorter: (a, b) => a.brand.localeCompare(b.brand),
+    },
     {
       title: 'Class',
       dataIndex: 'class',
@@ -773,9 +1555,18 @@ export default function ProductAdminTable() {
       dataIndex: 'rptclassID',
       className: "custom-select-ant",
       width: 100,
-      sorter: (a, b) => a.rptclassID.localeCompare(b.rptclassID),
+      sorter: (a, b) => {
+        const cA = a.rptclassID || '';
+        const cB = b.rptclassID || '';
+        return cA.toString().localeCompare(cB.toString());
+      },
       ...getAddClassOptionProps(),
       render: (value: string, record: ProductRow) => {
+        // filter ตาม CategoryID ของแถวนั้น
+        const filteredOptions = classOptions.filter(
+          (opt) => opt.rptCategoryID === record.categoryID
+        );
+
         return (
           <Select
             value={value || undefined}
@@ -789,18 +1580,17 @@ export default function ProductAdminTable() {
               );
             }}
             style={{ width: '100%' }}
-            popupMatchSelectWidth={false} 
-            options={classOptions.map((item) => ({
+            popupMatchSelectWidth={false}
+            options={filteredOptions.map((item) => ({
               label: <Tooltip title={item.label}>{item.label}</Tooltip>,
               value: item.value,
             }))}
-
           />
         );
-      }
+      },
     },
     {
-      title: 'ProductFeature',
+      title: 'Tag (Attribute)',
       dataIndex: 'features',
       width: 450,
       sorter: (a, b) => b.features.length - a.features.length,
@@ -835,8 +1625,9 @@ export default function ProductAdminTable() {
     {
       title: 'DayUse',
       dataIndex: 'dayUse',
-      width: 80,
+      width: 90,
       className: "custom-select-ant",
+      ...getAddDayUseOptionProps(),
       sorter: (a, b) => {
         const aVal = parseInt(a.dayUse || '0', 10);
         const bVal = parseInt(b.dayUse || '0', 10);
@@ -848,11 +1639,16 @@ export default function ProductAdminTable() {
       }
     },
     {
-      title: 'Frequency',
+      title: 'Frequency(wk)',
       dataIndex: 'frequency',
-      width: 120,
+      width: 128,
       className: "custom-select-ant",
-      sorter: (a, b) => a.frequency.localeCompare(b.frequency),
+      ...getAddFrequencyOptionProps(),
+      sorter: (a, b) => {
+        const fA = a.frequency || '';
+        const fB = b.frequency || '';
+        return fA.toString().localeCompare(fB.toString());
+      },
       render: (value, record) => {
         const disabled = !(
           (record.categoryID === '03' && record.mainGroupID === '18') ||
@@ -863,9 +1659,9 @@ export default function ProductAdminTable() {
       }
     },
     {
-      title: 'Time',
+      title: 'Time(minute)',
       dataIndex: 'time',
-      width: 80,
+      width: 110,
       className: "custom-select-ant",
       sorter: (a, b) => {
         const aVal = parseInt(a.time || '0', 10);
@@ -879,7 +1675,28 @@ export default function ProductAdminTable() {
     },
   ];
 
-  
+  const hasUnsavedChanges = (): boolean => {
+    return data.some((currentItem) => {
+      const originalItem = originalData.find((o) => o.key === currentItem.key);
+      if (!originalItem) return false;
+
+      if (JSON.stringify(currentItem.features) !== JSON.stringify(originalItem.features)) return true;
+      if (currentItem.dayUse !== originalItem.dayUse) return true;
+      if (currentItem.frequency !== originalItem.frequency) return true;
+      if (currentItem.time !== originalItem.time) return true;
+      if (currentItem.rptclassID !== originalItem.rptclassID) return true;
+
+      return false;
+    });
+  };
+
+  // ส่งฟังก์ชันไป AppLayout
+  useEffect(() => {
+    console.log("Check unsaved:", hasUnsavedChanges());
+    setHasUnsavedChanges(hasUnsavedChanges); // ส่งฟังก์ชัน
+  }, [data, originalData]);
+
+
   const [tableHeight, setTableHeight] = useState(300);
   const [isZoomed, setIsZoomed] = useState(false);
   // คำนวณความสูงแบบ dynamic
@@ -934,7 +1751,7 @@ export default function ProductAdminTable() {
                 placeholder="ค้นหาชื่อสินค้า"
                 defaultValue={search.nameProduct}
                 onChange={(e) => handleNameChange(e.target.value)}
-                onPressEnter={() => handleSearch()}
+                onPressEnter={() => handleSearch(search)}
                 style={{ width: 200 }}
                 allowClear
               />
@@ -958,7 +1775,7 @@ export default function ProductAdminTable() {
             </Col>
 
             <Col style={{ display: 'flex', flexDirection: 'column' }}>
-              <Text strong>ยี่ห้อ</Text>
+              <Text strong>กลุ่ม</Text>
               <Select
                 mode="multiple"
                 style={{ width: 500 }}
@@ -1014,7 +1831,19 @@ export default function ProductAdminTable() {
               <Button
                 icon={<SearchOutlined />}
                 onClick={() => {
-                  handleSearch();
+                  if (hasUnsavedChanges()) {
+                    Modal.confirm({
+                      title: 'มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก',
+                      content: 'คุณต้องการค้นหาต่อหรือไม่? ข้อมูลที่แก้ไขจะหายไปถ้าไม่ได้บันทึก',
+                      okText: 'ค้นหาต่อ (ทิ้งการแก้ไข)',
+                      cancelText: 'ยกเลิก',
+                      onOk: () => {
+                        handleSearch(search);
+                      },
+                    });
+                  } else {
+                    handleSearch(search);
+                  }
                 }}
                 type="primary"
               >

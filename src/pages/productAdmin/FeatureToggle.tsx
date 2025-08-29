@@ -47,6 +47,27 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
     }
   }, [features, open]);
 
+  useEffect(() => {
+    if (open && features.length === 0) {
+      // 🔎 หาเพื่อนที่มีค่า features
+      const allData = (window as any).__ALL_PRODUCTS__ || []; // เก็บ data จาก parent
+      const me = allData.find((item: any) => item.key === recordKey);
+
+      if (me && me.productUniqueID) {
+        const friend = allData.find(
+          (item: any) =>
+            item.productUniqueID === me.productUniqueID &&
+            item.features &&
+            item.features.length > 0
+        );
+
+        if (friend) {
+          console.log("📌 copy features from friend:", friend.features);
+          onChange(recordKey, [...friend.features]);
+        }
+      }
+    }
+  }, [open]);
 
 
   useEffect(() => {

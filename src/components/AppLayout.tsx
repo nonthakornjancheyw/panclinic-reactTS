@@ -1,4 +1,4 @@
-import { Layout, Menu, Button, Dropdown, Space, message} from 'antd';
+import { Layout, Menu, Button, Dropdown, Space, message, Modal } from 'antd';
 import type { ReactNode } from 'react';
 import {
   WalletOutlined,
@@ -17,25 +17,27 @@ const { Header, Sider, Content } = Layout;
 
 interface Props {
   children: ReactNode;
+  hasUnsavedChanges?: (() => boolean); // callback function
 }
 
-function AppLayout({ children }: Props) {
+function AppLayout({ children, hasUnsavedChanges }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+
   const userInfo = {
     name: 'นนทกร จั่นเชย',
     employeeId: '53800001',
     branch: 'ร้อยเอ็ด',
   };
+
   const userMenuItems = [
     { key: 'changePassword', label: 'เปลี่ยนรหัสผ่าน' },
     { key: 'logout', label: 'Logout' },
   ];
-  
+
   const onUserMenuClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      // ตัวอย่าง logout
       console.log('Logout clicked');
       message.info('Logging out...');
     } else if (key === 'changePassword') {
@@ -43,7 +45,33 @@ function AppLayout({ children }: Props) {
       message.info('Redirect to change password page...');
     }
   };
-  
+
+  const handleMenuClick = ({ key }: { key: string }) => {
+    console.log("Clicked menu key:", key);
+    console.log("Current pathname:", location.pathname);
+    console.log("hasUnsavedChanges value:", hasUnsavedChanges);
+    if (location.pathname !== '/productAdmin') {
+      navigate(key);
+      return;
+    }
+    if (location.pathname === key) return;
+
+    if (hasUnsavedChanges) {
+      Modal.confirm({
+        title: "มีการแก้ไขที่ยังไม่ได้บันทึก",
+        content: "คุณต้องการออกจากหน้านี้หรือไม่? ข้อมูลที่แก้ไขจะหายไป กรุณากดบันทึกก่อนย้ายหน้า",
+        okText: "ออกจากหน้านี้",
+        cancelText: "ยกเลิก",
+        onOk: () => navigate(key),
+      });
+    } else {
+      navigate(key);
+    }
+  };
+
+
+
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
@@ -76,7 +104,7 @@ function AppLayout({ children }: Props) {
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
-          onClick={({ key }) => navigate(key)}
+          onClick={handleMenuClick}
           style={{ backgroundColor: '#0e8dd6ff' }}
           rootClassName="custom-menu"
           items={[
@@ -97,13 +125,19 @@ function AppLayout({ children }: Props) {
             },
           ]}
         />
-
       </Sider>
 
-
       <Layout>
-        <Header style={{ background: '#ffffffff', padding: '0 16px', zIndex: 999, 
-          position: 'sticky', top: 0, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)', }}>
+        <Header
+          style={{
+            background: '#ffffffff',
+            padding: '0 16px',
+            zIndex: 999,
+            position: 'sticky',
+            top: 0,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 64 }}>
             <img src={logo} alt="Panclinic Logo" style={{ height: 40 }} />
 
@@ -116,15 +150,15 @@ function AppLayout({ children }: Props) {
               </a>
             </Dropdown>
           </div>
-
-          
         </Header>
-   
-        <Content style={{
-          padding: '8px 8px',
-          overflowY: 'auto',
-          height: 'calc(100vh - 64px)', // ลบความสูง header ออก (ถ้า Header สูง 64px)
-        }}>
+
+        <Content
+          style={{
+            padding: '8px 8px',
+            overflowY: 'auto',
+            height: 'calc(100vh - 64px)',
+          }}
+        >
           {children}
         </Content>
       </Layout>
