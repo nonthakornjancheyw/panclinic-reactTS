@@ -20,12 +20,6 @@ import { createPortal } from 'react-dom';
 const { Content } = Layout;
 const { Option } = Select;
 
-type OptionColor = {
-  value: string;  
-  label: string;
-  color: string;
-};
-
 interface ProductRow {
   key: string;
   categoryID: string;
@@ -52,11 +46,11 @@ interface Brand {
   CategoryOrder: number;
 }
 
-interface TagOption {
-  label: string;    // TagName
-  value: string;    // TagID
-  color: string;    // สี
-}
+type OptionColor = {
+  label: string;
+  value: string;  
+  color: string;
+};
 
 
 type Option = { label: string; value: string; color?: string };
@@ -150,7 +144,7 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
   const [allBrands, setAllBrands] = useState<Brand[]>([]); //เก็บbrandทั้งหมด
   const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]); // เอาไว้ bind Select
 
-  const [tagOptions, setTagOptions] = React.useState<TagOption[]>([]); //เก็บ tag 
+  const [tagOptions, setTagOptions] = React.useState<OptionColor[]>([]); //เก็บ tag 
   const [classOptions, setClassOptions] = useState<{ label: string; value: string; rptCategoryID: string }[]>([]);
 
   const [dayUseOptions, setDayUseOptions] = useState<OptionColor[]>([]);
@@ -237,24 +231,6 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     setFrequencyOptions(getOption.Frequency);
     setTimeOptions(getOption.Time);
   };
-
-  const handleAddNewTag = async (newTag: string) => {
-    const res = await productApi.AddTag(newTag) as any;
-    if (res.success) {
-      await fetchTags();
-      message.success(`เพิ่ม Tag "${res.tagName}" สำเร็จ`);
-      return true;
-    } 
-    
-    if (res.error === 'duplicate') {
-      await fetchTags();
-      message.warning(`Tag "${newTag}" มีอยู่แล้ว`);
-      return false;
-    }
-    message.error(res.message || 'เกิดข้อผิดพลาดในการเพิ่ม Tag');
-    return false;
-  };
-
 
   useEffect(() => {
     fetchData();
@@ -700,6 +676,11 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
           console.log("DeleteClass API response:", res);
 
           if (res.success) {
+            // message.success(
+            //   <span>
+            //     <span style={{ color: 'red' }}>ลบ</span> รายการ {deleteItem.label} สำเร็จ
+            //   </span>
+            // );
             message.success("ลบรายการ " + deleteItem.label + " สำเร็จ");
           } else {
             // ตรวจสอบ error เฉพาะ
@@ -779,9 +760,9 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             {editItem ? (
               <>
+                
                 <Button
-                  variant="solid"
-                  color="green"
+                  type="primary"
                   block
                   disabled={!canSaveEdit} // <<< disable ปุ่มถ้า duplicate หรือชื่อว่าง
                   onClick={handleSaveEdit}
@@ -790,12 +771,7 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
                 </Button>
 
                 <Button
-                  variant="filled"
-                  color="orange"
                   block
-                  style={{
-                    border: '1px solid #ffa940',
-                  }}
                   onClick={() => {
                     setEditItem(null);
                     setValue('');
@@ -894,115 +870,153 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     return { filterDropdown: dropdownContent, filterIcon: () => <SettingOutlined /> };
   };
 
-  const getAddDayUseOptionProps = () => {
+  interface GetAddOptionPropsConfig {
+    type: "dayuse" | "frequency" | "time";
+    options: OptionColor[];
+  }
+
+  const getAddOptionProps = ({ type, options }: GetAddOptionPropsConfig) => {
     const dropdownContent = () => {
-      const [value, setValue] = useState('');
-      const [color, setColor] = useState<string>('#69c0ff');
+      const [value, setValue] = useState("");
+      const [color, setColor] = useState<string>("#69c0ff");
       const [showPicker, setShowPicker] = useState(false);
       const [editItem, setEditItem] = useState<OptionColor & { originalValue?: string } | null>(null);
       const [deleteItem, setDeleteItem] = useState<OptionColor | null>(null);
       const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
       const colorBtnRef = useRef<HTMLDivElement | null>(null);
 
+      // ค่า filter จาก input
+      const filterText = editItem ? editItem.value : value;
+
+      // กรอง options ตาม filterText
+      const filteredOptions = options.filter((item) =>
+        item.value.includes(filterText)
+      );
+
+      // label/unit ตาม type
+      const unit = type === "dayuse" ? "Day" : type === "frequency" ? "wk" : "min";
+      const labelName =
+        type === "dayuse" ? "DayUse" : type === "frequency" ? "Frequency" : "Time";
+
       const trimmed = value.trim();
-      const exists = dayUseOptions.some(
+      const exists = options.some(
         (item) => item.value === trimmed && (!editItem || item.value !== editItem.value)
       );
-      const canAdd = trimmed !== '' && /^\d+$/.test(trimmed) && !exists;
+      const canAdd = trimmed !== "" && /^\d+$/.test(trimmed) && !exists;
 
+      // ---------------- Add ----------------
       const handleAdd = async () => {
         if (!canAdd) return;
-        
+
         const newOption: OptionColor = {
           value: trimmed,
-          label: `${trimmed} Day`,
+          label: `${trimmed} ${unit}`,
           color,
         };
-        const res = await productApi.AddDayUse(trimmed, newOption.label, newOption.color) as any;
+
+        let res: any;
+        if (type === "dayuse") {
+          res = await productApi.AddDayUse(trimmed, newOption.label, newOption.color);
+        } else if (type === "frequency") {
+          res = await productApi.AddFrequency(trimmed, newOption.label, newOption.color);
+        } if (type === "time") {
+          res = await productApi.AddTime(trimmed, newOption.label, newOption.color);
+        }
+
         if (res.success) {
-          await fetchOptions();
-          message.success("เพิ่ม DayUse " + newOption.label + " สำเร็จ");
+          await fetchOptions(); // ✅ ฟังก์ชันกลาง ไม่ต้องส่งเข้า config
+          message.success(`เพิ่ม ${labelName} ${newOption.label} สำเร็จ`);
+          setValue("");
           return true;
         }
         if (res.error === "duplicate") {
           await fetchOptions();
-          message.warning('DayUse "' + newOption.label + '" มีอยู่แล้ว');
+          message.warning(`${labelName} "${newOption.label}" มีอยู่แล้ว`);
           return false;
         }
-        message.error(res.message || "เกิดข้อผิดพลาดในการเพิ่ม Class");
+        message.error(res.message || `เกิดข้อผิดพลาดในการเพิ่ม ${labelName}`);
         return false;
       };
 
+      // ---------------- Save Edit ----------------
       const canSaveEdit =
-      editItem !== null &&
-      editItem.value.trim() !== '' &&
-      /^\d+$/.test(editItem.value) &&
-      !dayUseOptions.some(
-        (item) => item.value === editItem.value && item.value !== editItem.originalValue
-      );
+        editItem !== null &&
+        editItem.value.trim() !== "" &&
+        /^\d+$/.test(editItem.value) &&
+        !options.some(
+          (item) => item.value === editItem.value && item.value !== editItem.originalValue
+        );
 
       const handleSaveEdit = async () => {
-          if (!editItem) return;
+        if (!editItem) return;
 
-          const oldDayValue = editItem.originalValue ?? editItem.value; // เก็บค่าเก่าตอนกด edit
-          const newDayValue = editItem.value; // ค่าใหม่จาก input
-          const newLabel = editItem.label;
-          const newColor = editItem.color;
-          console.log("Editing DayUse:", { oldDayValue, newDayValue, newLabel, newColor });
-          // เรียก API
-          const res = await productApi.EditDayUse(oldDayValue, newDayValue, newLabel, newColor) as any;
+        const oldValue = editItem.originalValue ?? editItem.value;
+        const newValue = editItem.value;
+        const newLabel = editItem.label;
+        const newColor = editItem.color;
 
-          if (res.success) {
-            await fetchOptions();
-            message.success("แก้ไข DayUse " + newLabel + " สำเร็จ");
-            setEditItem(null);
-            setValue('');
-            setColor('#69c0ff');
-            return true;
-          }
+        let res: any;
+        if (type === "dayuse") {
+          res = await productApi.EditDayUse(oldValue, newValue, newLabel, newColor);
+        } else if (type === "frequency") {
+          res = await productApi.EditFrequency(oldValue, newValue, newLabel, newColor);
+        } else if (type === "time") {
+          res = await productApi.EditTime(oldValue, newValue, newLabel, newColor);
+        }
 
-          if (res.error === 'duplicate') {
-            await fetchOptions();
-            message.warning('DayValue "' + newDayValue + '" มีอยู่แล้ว');
-            return false;
-          }
-          if (res.error === 'notfound') {
-            message.error('ไม่พบ DayValue เก่าในระบบ');
-            return false;
-          }
-          message.error(res.message || 'เกิดข้อผิดพลาดในการแก้ไข DayUse');
+        if (res.success) {
+          await fetchOptions();
+          message.success(`แก้ไข ${labelName} ${newLabel} สำเร็จ`);
+          setEditItem(null);
+          setValue("");
+          setColor("#69c0ff");
+          return true;
+        }
+
+        if (res.error === "duplicate") {
+          await fetchOptions();
+          message.warning(`${labelName} "${newValue}" มีอยู่แล้ว`);
           return false;
-        };
+        }
+        if (res.error === "notfound") {
+          message.error(`ไม่พบ ${labelName} เก่าในระบบ`);
+          return false;
+        }
+        message.error(res.message || `เกิดข้อผิดพลาดในการแก้ไข ${labelName}`);
+        return false;
+      };
 
-
+      // ---------------- Delete ----------------
       const handleConfirmDelete = async () => {
         if (!deleteItem) return false;
 
-        try {
-          const res: any = await productApi.DeleteDayUse(deleteItem.value);
-          if (res.success) {
-            message.success(`ลบ DayUse "${deleteItem.label}" สำเร็จ`);
-          } else {
-            if (res.error === 'notfound') {
-              message.error(`ไม่พบ DayUse "${deleteItem.label}" ในระบบ`);
-            } else if (res.error === 'exception') {
-              message.error(`เกิดข้อผิดพลาดในการลบ DayUse "${deleteItem.label}"`);
-            } else {
-              message.error(res.message || `ไม่สามารถลบ DayUse "${deleteItem.label}" ได้`);
-            }
-          }
-          // รีเฟรช options ใหม่
-          await fetchOptions();
-          setDeleteItem(null);
-          return res.success;
-        } catch (error) {
-          console.error("DeleteDayUse unexpected error:", error);
-          message.error(`เกิดข้อผิดพลาดไม่คาดคิดในการลบ DayUse "${deleteItem.label}"`);
-          return false;
+        let res: any;
+        if (type === "dayuse") {
+          res = await productApi.DeleteDayUse(deleteItem.value);
+        } else if (type === "frequency") {
+          res = await productApi.DeleteFrequency(deleteItem.value);
+        } else if (type === "time") {
+          res = await productApi.DeleteTime(deleteItem.value);
         }
+
+        if (res.success) {
+          message.success(`ลบ ${labelName} "${deleteItem.label}" สำเร็จ`);
+        } else {
+          if (res.error === "notfound") {
+            message.error(`ไม่พบ ${labelName} "${deleteItem.label}" ในระบบ`);
+          } else if (res.error === "exception") {
+            message.error(`เกิดข้อผิดพลาดในการลบ ${labelName} "${deleteItem.label}"`);
+          } else {
+            message.error(res.message || `ไม่สามารถลบ ${labelName} "${deleteItem.label}" ได้`);
+          }
+        }
+
+        await fetchOptions();
+        setDeleteItem(null);
+        return res.success;
       };
 
-
+      // ---------------- Picker ----------------
       const togglePicker = () => {
         if (!showPicker && colorBtnRef.current) {
           const rect = colorBtnRef.current.getBoundingClientRect();
@@ -1011,91 +1025,60 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
         setShowPicker(!showPicker);
       };
 
+      // ---------------- Render ----------------
       return (
         <div style={{ padding: 8, width: 225 }}>
           {/* Header */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              marginBottom: 4,
-              fontWeight: 600,
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ flex: 1 }}>Day</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 4, fontWeight: 600, alignItems: "center" }}>
+            <div style={{ flex: 1 }}>{labelName}</div>
             <div style={{ width: 32 }}>Color</div>
           </div>
 
           {/* Input + Color */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              marginBottom: 8,
-              alignItems: 'center',
-            }}
-          >
-            {/* Input Day */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
             <Input
-              placeholder="Day"
-              maxLength={3} // รับได้สูงสุด 3 หลัก = 999
+              placeholder={labelName}
+              maxLength={3}
               value={editItem ? editItem.value : value}
               onChange={(e) => {
-                const newValue = e.target.value.replace(/\D/g, ''); // รับแค่ตัวเลข
-                const newLabel = newValue === '' || newValue === '0' ? '-' : newValue + ' Day';
+                const newValue = e.target.value.replace(/\D/g, "");
+                const newLabel =
+                  newValue === "" || newValue === "0" ? "-" : newValue + " " + unit;
 
                 if (editItem) {
-                  setEditItem({
-                    ...editItem,
-                    value: newValue,
-                    label: newLabel,
-                  });
+                  setEditItem({ ...editItem, value: newValue, label: newLabel });
                 } else {
                   setValue(newValue);
                 }
               }}
               onPressEnter={editItem ? handleSaveEdit : handleAdd}
-              style={{ flex: 1 }} // ขยายเต็มพื้นที่
-              addonAfter="Day" // แสดง unit ต่อท้าย
+              style={{ flex: 1 }}
+              addonAfter={unit}
             />
 
             {/* Color Picker Trigger */}
-            <div style={{ width: 32, position: 'relative' }}>
+            <div style={{ width: 32, position: "relative" }}>
               <div
                 ref={colorBtnRef}
                 onClick={togglePicker}
                 style={{
-                  width: '100%',
+                  width: "100%",
                   height: 32,
                   borderRadius: 6,
-                  border: '1px solid #ddd',
-                  cursor: 'pointer',
+                  border: "1px solid #ddd",
+                  cursor: "pointer",
                   background: editItem ? editItem.color : color,
                 }}
               />
               {showPicker &&
                 createPortal(
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
-                    {/* Background คลิกปิด */}
-                    <div
-                      onClick={() => setShowPicker(false)}
-                      style={{ position: 'fixed', inset: 0 }}
-                    />
-                    {/* Picker */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: pickerPos.top,
-                        left: pickerPos.left,
-                      }}
-                    >
+                  <div style={{ position: "fixed", inset: 0, zIndex: 2000 }}>
+                    <div onClick={() => setShowPicker(false)} style={{ position: "fixed", inset: 0 }} />
+                    <div style={{ position: "absolute", top: pickerPos.top, left: pickerPos.left }}>
                       <HexColorPicker
                         color={editItem ? editItem.color : color}
                         onChange={(newColor) =>
-                          editItem
-                            ? setEditItem({ ...editItem, color: newColor })
-                            : setColor(newColor)
+                          editItem ? setEditItem({ ...editItem, color: newColor }) : setColor(newColor)
                         }
                       />
                     </div>
@@ -1106,7 +1089,7 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
           </div>
 
           {/* ปุ่ม Add / Save */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             {editItem ? (
               <>
                 <Button type="primary" block disabled={!canSaveEdit} onClick={handleSaveEdit}>
@@ -1116,8 +1099,8 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
                   block
                   onClick={() => {
                     setEditItem(null);
-                    setValue('');
-                    setColor('#69c0ff');
+                    setValue("");
+                    setColor("#69c0ff");
                   }}
                 >
                   ยกเลิก
@@ -1130,17 +1113,17 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
             )}
           </div>
 
-          {/* รายการตัวเลือก */}
-          <div style={{ maxHeight: 150, overflowY: 'auto' }}>
-            {dayUseOptions.length > 0 ? (
-              dayUseOptions.map((item, idx) => (
+          {/* รายการ */}
+          <div style={{ maxHeight: 150, overflowY: "auto" }}>
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((item, idx) => (
                 <div
                   key={idx}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    borderBottom: '1px solid #f0f0f0',
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "4px 8px",
+                    borderBottom: "1px solid #f0f0f0",
                     gap: 8,
                   }}
                 >
@@ -1150,15 +1133,16 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
                       style={{
                         width: 22,
                         height: 22,
-                        borderRadius: '50%',
+                        borderRadius: "50%",
                         background: item.color,
-                        border: '1px solid #ccc',
+                        border: "1px solid #ccc",
                       }}
                     />
                   </div>
-                  <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
+                  <div style={{ flexShrink: 0, display: "flex", gap: 4 }}>
                     <Button
-                      type="text"
+                      color="blue"
+                      variant="text"
                       size="small"
                       icon={<EditOutlined />}
                       onClick={() => setEditItem({ ...item, originalValue: item.value })}
@@ -1174,14 +1158,22 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
                 </div>
               ))
             ) : (
-              <div style={{ color: '#999', padding: '4px 8px' }}>No options</div>
+              <div style={{ color: "#999", padding: "4px 8px" }}>No options</div>
             )}
           </div>
 
           {/* Modal Delete */}
           <Modal
-            open={!!deleteItem}
-            title={`คุณต้องการลบ DayUse "${deleteItem?.label}" ใช่หรือไม่?`}
+            open={!!deleteItem}     
+            title={
+              <>
+                คุณต้องการลบ {labelName}{" "}
+                <span style={{ color: "red" }}>
+                  "{deleteItem?.label}"
+                </span>{" "}
+                ใช่หรือไม่?
+              </>
+            }
             onOk={handleConfirmDelete}
             onCancel={() => setDeleteItem(null)}
             okText="ลบ"
@@ -1199,224 +1191,104 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     return { filterDropdown: dropdownContent, filterIcon: () => <SettingOutlined /> };
   };
 
-  const getAddFrequencyOptionProps = () => {
+  const getAddTagColumnProps = (tagOptions: OptionColor[]) => {
     const dropdownContent = () => {
       const [value, setValue] = useState('');
-      const [color, setColor] = useState<string>('#69c0ff');
-      const [showPicker, setShowPicker] = useState(false);
       const [editItem, setEditItem] = useState<OptionColor & { originalValue?: string } | null>(null);
       const [deleteItem, setDeleteItem] = useState<OptionColor | null>(null);
-      const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-      const colorBtnRef = useRef<HTMLDivElement | null>(null);
 
-      const trimmed = value.trim();
-      const exists = frequencyOptions.some(
-        (item) => item.value === trimmed && (!editItem || item.value !== editItem.value)
-      );
-      const canAdd = trimmed !== '' && /^\d+$/.test(trimmed) && !exists;
-
+      // ---------------- Add ----------------
       const handleAdd = async () => {
-        if (!canAdd) return;
+        const trimmed = value.trim();
+        if (!trimmed) return;
 
-        const newOption: OptionColor = {
-          value: trimmed,
-          label: `${trimmed} wk`,
-          color,
-        };
-        const res = await productApi.AddFrequency(trimmed, newOption.label, newOption.color) as any;
+        const exists = tagOptions.some(item => item.label === trimmed);
+        if (exists) {
+          message.warning(`Tag "${trimmed}" มีอยู่แล้ว`);
+          return;
+        }
+
+        const res: any = await productApi.AddTag(trimmed);
         if (res.success) {
-          await fetchOptions();
-          message.success("เพิ่ม Frequency " + newOption.label + " สำเร็จ");
-          return true;
+          await fetchTags();
+          message.success(`เพิ่ม Tag "${res.tagName}" สำเร็จ`);
+          setValue('');
+        } else {
+          message.error(res.message || 'เกิดข้อผิดพลาดในการเพิ่ม Tag');
         }
-        if (res.error === "duplicate") {
-          await fetchOptions();
-          message.warning('Frequency "' + newOption.label + '" มีอยู่แล้ว');
-          return false;
-        }
-        message.error(res.message || "เกิดข้อผิดพลาดในการเพิ่ม Frequency");
-        return false;
       };
 
-      const canSaveEdit =
-        editItem !== null &&
-        editItem.value.trim() !== '' &&
-        /^\d+$/.test(editItem.value) &&
-        !frequencyOptions.some(
-          (item) => item.value === editItem.value && item.value !== editItem.originalValue
-        );
-
+      // ---------------- Save Edit ----------------
       const handleSaveEdit = async () => {
         if (!editItem) return;
 
-        const oldValue = editItem.originalValue ?? editItem.value;
-        const newValue = editItem.value;
-        const newLabel = editItem.label;
-        const newColor = editItem.color;
+        const newTag = editItem.label.trim();
+        if (!newTag) return;
 
-        const res = await productApi.EditFrequency(oldValue, newValue, newLabel, newColor) as any;
+        // ตรวจสอบ duplicate โดยไม่เอา item ตัวเอง
+        const exists = tagOptions.some(
+          item => item.label === newTag && item.value !== editItem.value
+        );
+        if (exists) {
+          message.warning(`Tag "${newTag}" มีอยู่แล้ว`);
+          return;
+        }
+
+        const tagId = editItem.value; // id ของ tag ที่จะ update
+        const res: any = await productApi.EditTag(tagId, newTag); // ส่ง id + label ใหม่
 
         if (res.success) {
-          await fetchOptions();
-          message.success("แก้ไข Frequency " + newLabel + " สำเร็จ");
+          await fetchTags();
+          message.success(`แก้ไข Tag "${newTag}" สำเร็จ`);
           setEditItem(null);
           setValue('');
-          setColor('#69c0ff');
-          return true;
+        } else {
+          message.error(res.message || 'เกิดข้อผิดพลาดในการแก้ไข Tag');
         }
-
-        if (res.error === 'duplicate') {
-          await fetchOptions();
-          message.warning('Frequency "' + newValue + '" มีอยู่แล้ว');
-          return false;
-        }
-        if (res.error === 'notfound') {
-          message.error('ไม่พบ Frequency เก่าในระบบ');
-          return false;
-        }
-        message.error(res.message || 'เกิดข้อผิดพลาดในการแก้ไข Frequency');
-        return false;
       };
 
+
+      // ---------------- Delete ----------------
       const handleConfirmDelete = async () => {
-        if (!deleteItem) return false;
+        if (!deleteItem) return;
 
-        try {
-          const res: any = await productApi.DeleteFrequency(deleteItem.value);
-          if (res.success) {
-            message.success(`ลบ Frequency "${deleteItem.label}" สำเร็จ`);
-          } else {
-            if (res.error === 'notfound') {
-              message.error(`ไม่พบ Frequency "${deleteItem.label}" ในระบบ`);
-            } else if (res.error === 'exception') {
-              message.error(`เกิดข้อผิดพลาดในการลบ Frequency "${deleteItem.label}"`);
-            } else {
-              message.error(res.message || `ไม่สามารถลบ Frequency "${deleteItem.label}" ได้`);
-            }
-          }
-          await fetchOptions();
-          setDeleteItem(null);
-          return res.success;
-        } catch (error) {
-          console.error("DeleteFrequency unexpected error:", error);
-          message.error(`เกิดข้อผิดพลาดไม่คาดคิดในการลบ Frequency "${deleteItem.label}"`);
-          return false;
+        const res: any = await productApi.DeleteTag(deleteItem.value);
+        if (res.success) {
+          await fetchTags();
+          message.success(`ลบ Tag "${deleteItem.label}" สำเร็จ`);
+        } else {
+          message.error(res.message || `เกิดข้อผิดพลาดในการลบ Tag "${deleteItem.label}"`);
         }
+
+        setDeleteItem(null);
       };
 
-      const togglePicker = () => {
-        if (!showPicker && colorBtnRef.current) {
-          const rect = colorBtnRef.current.getBoundingClientRect();
-          setPickerPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX });
-        }
-        setShowPicker(!showPicker);
-      };
+      const canAdd = value.trim() !== '' && !tagOptions.some(item => item.label === value);
+      const canSaveEdit =
+        editItem !== null &&
+        editItem.label.trim() !== '' &&
+        !tagOptions.some(item => item.label === editItem.label && item.value !== editItem.originalValue);
 
       return (
-        <div style={{ padding: 8, width: 225 }}>
-          {/* Header */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              marginBottom: 4,
-              fontWeight: 600,
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ flex: 1 }}>Frequency</div>
-            <div style={{ width: 32 }}>Color</div>
-          </div>
+        <div style={{ padding: 8, width: '100%', maxWidth: 300 }}>
+          <Input
+            placeholder="Add Tag"
+            value={editItem ? editItem.label : value}
+            onChange={(e) =>
+              editItem
+                ? setEditItem({ ...editItem, label: e.target.value })
+                : setValue(e.target.value)
+            }
+            onPressEnter={editItem ? handleSaveEdit : handleAdd}
+          />
 
-          {/* Input + Color */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              marginBottom: 8,
-              alignItems: 'center',
-            }}
-          >
-            {/* Input Frequency */}
-            <Input
-              placeholder="Frequency"
-              maxLength={3} // สูงสุด 3 หลัก = 999
-              value={editItem ? editItem.value : value}
-              onChange={(e) => {
-                const newValue = e.target.value.replace(/\D/g, ''); // รับเฉพาะตัวเลข
-                const newLabel = newValue === '' || newValue === '0' ? '-' : newValue + ' wk';
-
-                if (editItem) {
-                  setEditItem({ ...editItem, value: newValue, label: newLabel });
-                } else {
-                  setValue(newValue);
-                }
-              }}
-              onPressEnter={editItem ? handleSaveEdit : handleAdd}
-              style={{ flex: 1 }} // ขยายเต็มพื้นที่
-              addonAfter="wk" // แสดง unit ต่อท้าย
-            />
-
-            {/* Color Picker Trigger */}
-            <div style={{ width: 32, position: 'relative' }}>
-              <div
-                ref={colorBtnRef}
-                onClick={togglePicker}
-                style={{
-                  width: '100%',
-                  height: 32,
-                  borderRadius: 6,
-                  border: '1px solid #ddd',
-                  cursor: 'pointer',
-                  background: editItem ? editItem.color : color,
-                }}
-              />
-              {showPicker &&
-                createPortal(
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
-                    {/* Background คลิกปิด */}
-                    <div
-                      onClick={() => setShowPicker(false)}
-                      style={{ position: 'fixed', inset: 0 }}
-                    />
-                    {/* Picker */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: pickerPos.top,
-                        left: pickerPos.left,
-                      }}
-                    >
-                      <HexColorPicker
-                        color={editItem ? editItem.color : color}
-                        onChange={(newColor) =>
-                          editItem ? setEditItem({ ...editItem, color: newColor }) : setColor(newColor)
-                        }
-                      />
-                    </div>
-                  </div>,
-                  document.body
-                )}
-            </div>
-          </div>
-
-          {/* Add / Save Buttons */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             {editItem ? (
               <>
                 <Button type="primary" block disabled={!canSaveEdit} onClick={handleSaveEdit}>
                   บันทึกการแก้ไข
                 </Button>
-                <Button
-                  block
-                  onClick={() => {
-                    setEditItem(null);
-                    setValue('');
-                    setColor('#69c0ff');
-                  }}
-                >
-                  ยกเลิก
-                </Button>
+                <Button block onClick={() => setEditItem(null)}>ยกเลิก</Button>
               </>
             ) : (
               <Button type="primary" block disabled={!canAdd} onClick={handleAdd}>
@@ -1425,65 +1297,61 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
             )}
           </div>
 
-          {/* List */}
-          <div style={{ maxHeight: 150, overflowY: 'auto' }}>
-            {frequencyOptions.length > 0 ? (
-              frequencyOptions.map((item, idx) => (
+          <div style={{ maxHeight: 150, overflowY: 'auto', marginTop: 8 }}>
+            {tagOptions.length > 0 ? (
+              tagOptions.map(item => (
                 <div
-                  key={idx}
+                  key={item.value}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
                     padding: '4px 8px',
-                    borderBottom: '1px solid #f0f0f0',
-                    gap: 8,
+                    wordBreak: 'break-word',
+                    borderBottom: '1px solid #eee', // เส้นแบ่ง
                   }}
                 >
-                  <div style={{ flex: 1 }}>{item.label}</div>
-                  <div style={{ width: 35 }}>
-                    <div
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        background: item.color,
-                        border: '1px solid #ccc',
-                      }}
-                    />
-                  </div>
-                  <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  <span style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
                     <Button
-                      type="text"
+                      color="blue"
+                      variant="text"
                       size="small"
                       icon={<EditOutlined />}
                       onClick={() => setEditItem({ ...item, originalValue: item.value })}
                     />
                     <Button
-                      type="text"
+                      color="red"
+                      variant="text"
                       size="small"
-                      danger
                       icon={<DeleteOutlined />}
                       onClick={() => setDeleteItem(item)}
                     />
-                  </div>
+                  </span>
                 </div>
+
               ))
             ) : (
-              <div style={{ color: '#999', padding: '4px 8px' }}>No options</div>
+              <div style={{ color: "#999", padding: 4 }}>No options</div>
             )}
           </div>
 
-          {/* Delete Modal */}
           <Modal
             open={!!deleteItem}
-            title={`คุณต้องการลบ Frequency "${deleteItem?.label}" ใช่หรือไม่?`}
+            title={
+              <>
+                คุณต้องการลบ Tag{" "}
+                <span style={{ color: "red" }}>
+                  "{deleteItem?.label}"
+                </span>{" "}
+                ใช่หรือไม่?
+              </>
+            }
             onOk={handleConfirmDelete}
             onCancel={() => setDeleteItem(null)}
             okText="ลบ"
             okType="danger"
             cancelText="ยกเลิก"
-            zIndex={1500}
-            getContainer={document.body}
           >
             การลบนี้ไม่สามารถย้อนกลับได้
           </Modal>
@@ -1507,7 +1375,7 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     {
       title: 'Product Name',
       dataIndex: 'name',
-      width: 470,
+      width: 420,
       fixed: 'left',
       ...getColumnSearchProps('name'),
       sorter: (a, b) => a.name.localeCompare(b.name),
@@ -1594,6 +1462,7 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
       dataIndex: 'features',
       width: 450,
       sorter: (a, b) => b.features.length - a.features.length,
+      ...getAddTagColumnProps(tagOptions),
       render: (features: string[] | undefined, record) => (
         <FeatureToggle
           features={features || []}
@@ -1618,16 +1487,19 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
               });
             });
           }}
-        onAddNewTag={handleAddNewTag}
+
         />
       ),
     },
     {
       title: 'DayUse',
       dataIndex: 'dayUse',
-      width: 90,
+      width: 95,
       className: "custom-select-ant",
-      ...getAddDayUseOptionProps(),
+      ...getAddOptionProps({
+        type: "dayuse",
+        options: dayUseOptions,
+      }),
       sorter: (a, b) => {
         const aVal = parseInt(a.dayUse || '0', 10);
         const bVal = parseInt(b.dayUse || '0', 10);
@@ -1641,9 +1513,12 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     {
       title: 'Frequency(wk)',
       dataIndex: 'frequency',
-      width: 128,
+      width: 135,
       className: "custom-select-ant",
-      ...getAddFrequencyOptionProps(),
+      ...getAddOptionProps({
+        type: "frequency",
+        options: frequencyOptions,
+      }),
       sorter: (a, b) => {
         const fA = a.frequency || '';
         const fB = b.frequency || '';
@@ -1661,8 +1536,12 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     {
       title: 'Time(minute)',
       dataIndex: 'time',
-      width: 110,
+      width: 130,
       className: "custom-select-ant",
+      ...getAddOptionProps({
+        type: "time",
+        options: timeOptions,
+      }),
       sorter: (a, b) => {
         const aVal = parseInt(a.time || '0', 10);
         const bVal = parseInt(b.time || '0', 10);
@@ -1675,20 +1554,42 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
     },
   ];
 
+  const normalize = (val: any) => {
+    if (Array.isArray(val)) {
+      return JSON.stringify(val.map(v => typeof v === "object" ? normalizeObject(v) : v));
+    }
+    if (typeof val === "object" && val !== null) {
+      return JSON.stringify(normalizeObject(val));
+    }
+    return String(val ?? ""); // บังคับเป็น string เสมอ
+  };
+
+  const normalizeObject = (obj: any) => {
+    // sort key ให้เหมือนกันเสมอ
+    return Object.keys(obj)
+      .sort()
+      .reduce((acc, key) => {
+        acc[key] = normalize(obj[key]);
+        return acc;
+      }, {} as any);
+  };
+
+
   const hasUnsavedChanges = (): boolean => {
     return data.some((currentItem) => {
       const originalItem = originalData.find((o) => o.key === currentItem.key);
       if (!originalItem) return false;
 
-      if (JSON.stringify(currentItem.features) !== JSON.stringify(originalItem.features)) return true;
-      if (currentItem.dayUse !== originalItem.dayUse) return true;
-      if (currentItem.frequency !== originalItem.frequency) return true;
-      if (currentItem.time !== originalItem.time) return true;
-      if (currentItem.rptclassID !== originalItem.rptclassID) return true;
+      if (normalize(currentItem.features) !== normalize(originalItem.features)) return true;
+      if (normalize(currentItem.dayUse) !== normalize(originalItem.dayUse)) return true;
+      if (normalize(currentItem.frequency) !== normalize(originalItem.frequency)) return true;
+      if (normalize(currentItem.time) !== normalize(originalItem.time)) return true;
+      if (normalize(currentItem.rptclassID) !== normalize(originalItem.rptclassID)) return true;
 
       return false;
     });
   };
+
 
   // ส่งฟังก์ชันไป AppLayout
   useEffect(() => {
@@ -1778,7 +1679,7 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
               <Text strong>กลุ่ม</Text>
               <Select
                 mode="multiple"
-                style={{ width: 500 }}
+                style={{ width: 250 }}
                 value={search.brandID}
                 onChange={function (val) {
                   setSearch(function (prev) {
@@ -1854,9 +1755,14 @@ export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdmin
             <Col flex="auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
               <Button 
                 type="primary"
-                style={{ backgroundColor: '#07aa30ff', borderColor: '#52c41a' }}
+                style={
+                  hasUnsavedChanges()
+                    ? { backgroundColor: '#07aa30ff', borderColor: '#52c41a' } 
+                    : {}
+                }
+                disabled={!hasUnsavedChanges()}
                 icon={<SaveOutlined />}
-                onClick={handleSave}
+                onClick={handleSave}    
               >
                 บันทึก
               </Button>

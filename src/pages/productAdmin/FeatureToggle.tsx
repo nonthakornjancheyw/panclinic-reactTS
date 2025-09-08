@@ -20,10 +20,9 @@ interface FeatureToggleProps {
   recordKey: string;
   tagOptions: TagOption[];
   onChange: (key: string, value: string[]) => void;
-  onAddNewTag?: (newTag: string) => Promise<boolean>;
 }
 
-const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagOptions, onChange, onAddNewTag }) => {
+const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagOptions, onChange }) => {
  
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false); // ✅ เพิ่ม state สำหรับทิศ dropdown
@@ -96,33 +95,14 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
 
   const filteredOptions = useMemo(() => {
     const safeSearch = (searchValue ?? '').trim().toLowerCase();
+    if (safeSearch === '') return tagOptions;
 
-    const existingMatch = tagOptions.filter(opt =>
+    return tagOptions.filter(opt =>
       (opt.label ?? '').toLowerCase().includes(safeSearch) ||
       (opt.value ?? '').toLowerCase().includes(safeSearch)
     );
-
-    const exists = tagOptions.some(
-      (opt) =>
-        (opt.label ?? '').toLowerCase() === safeSearch ||
-        (opt.value ?? '').toLowerCase() === safeSearch
-    );
-
-    if (safeSearch === '') return tagOptions;
-
-    if (!exists) {
-      return [
-        {
-          label: `➕ ${searchValue}`,
-          value: searchValue,
-          isNew: true,
-        },
-        ...existingMatch,
-      ];
-    }
-
-    return existingMatch;
   }, [searchValue, tagOptions]);
+
 
 
 
@@ -131,13 +111,8 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
     onChange(recordKey, newList.map((item) => item.value));
   };
 
-  const toggleFeature = async (val: string, isNew?: boolean) => {
+  const toggleFeature = async (val: string) => {
     // val ต้องเป็น value เสมอ
-    if (isNew && onAddNewTag) {
-      const success = await onAddNewTag(val);
-      if (!success) return;
-    }
-
     let newList = [];
     if (features.includes(val)) {
       newList = features.filter((v) => v !== val);
@@ -312,22 +287,15 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
             {filteredOptions.map((opt) => {
               const value = opt.value;
               const label = opt.label;
-              const isNew = 'isNew' in opt && opt.isNew;
-              
-              // ใช้ features.includes(label) เพราะ features เก็บ label
+
               const isSelected = features.includes(label);
 
               return (
                 <div
                   key={value}
-                  onMouseDown={async (e) => {
+                  onMouseDown={(e) => {
                     e.preventDefault();
-                    // toggleFeature ต้องส่ง label แทน value เพราะ features เก็บ label
-                    await toggleFeature(isNew ? value : label, isNew);
-                    if (isNew) {
-                      setSearchValue('');
-
-                    }
+                    toggleFeature(label);
                   }}
                   style={{
                     display: 'flex',
@@ -357,6 +325,7 @@ const FeatureToggle: React.FC<FeatureToggleProps> = ({ features, recordKey, tagO
                 </div>
               );
             })}
+
           </div>
         </div>,
         document.body

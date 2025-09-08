@@ -1,6 +1,6 @@
 import axios from 'axios';
 // const BASE_URL = import.meta.env.VITE_API_DOMAIN || `http://localhost:3000`;
-const BASE_URL = import.meta.env.VITE_API_DOMAIN || 'http://localhost:3001';
+import { BASE_URL } from '../../config/api';
 
 export async function GetFetch() {
   try {
@@ -12,6 +12,7 @@ export async function GetFetch() {
     throw error;
   }
 }
+
 export async function GetTag() {
   try {
     const response = await axios.get(`${BASE_URL}/api/productAdmin/GetTag`);
@@ -31,7 +32,6 @@ export async function GetOption() {
     throw error;
   }
 }
-
 
 export async function GetClass() {
   try {
@@ -62,6 +62,8 @@ export async function GetProduct(nameProduct?: string, categoryID?: string, bran
 interface StatusResponse {
   success: boolean;
 }
+
+// #region Tag ========================//#
 export async function AddTag(newTag: string) {
   try {
     const response = await axios.post(`${BASE_URL}/api/productAdmin/AddTag`, { newTag });
@@ -71,7 +73,35 @@ export async function AddTag(newTag: string) {
     return { success: false };
   }
 }
+export async function EditTag(tagId: string, tagName: string) {
+  try {
+    const response = await axios.put(`${BASE_URL}/api/productAdmin/EditTag`, {
+      tagId,
+      tagName,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("EditTag error:", error);
+    return { success: false };
+  }
+}
+export async function DeleteTag(tagId: string) {
+  try {
+    const response = await axios.request({
+      url: `${BASE_URL}/api/productAdmin/DeleteTag`,
+      method: "delete",
+      data: { tagId }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("DeleteTag error:", error);
+    return { success: false };
+  }
+}
+// #endregion
 
+
+// #region Class ========================//
 export async function AddClass(newClass: string, categoryID?: string) {
   try {
     const response = await axios.post(`${BASE_URL}/api/productAdmin/AddClass`, { newClass, categoryID });
@@ -83,7 +113,7 @@ export async function AddClass(newClass: string, categoryID?: string) {
 }
 export async function EditClass(rptClassID: string, rptClassName: string, rptCategoryID?: string) {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/EditClass`, { rptClassID, rptClassName, rptCategoryID });
+    const response = await axios.put(`${BASE_URL}/api/productAdmin/EditClass`, { rptClassID, rptClassName, rptCategoryID });
     return response.data;
   } catch (error) {
     console.error(`EditClass error:`, error);
@@ -92,14 +122,21 @@ export async function EditClass(rptClassID: string, rptClassName: string, rptCat
 }
 export async function DeleteClass(rptClassID: string) {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/DeleteClass`, { rptClassID});
+    const response = await axios.request({
+      url: `${BASE_URL}/api/productAdmin/DeleteClass`,
+      method: "delete",
+      data: { rptClassID }
+    });
     return response.data;
   } catch (error) {
-    console.error(`EditClass error:`, error);
+    console.error("DeleteClass error:", error);
     return { success: false };
   }
 }
+// #endregion
 
+
+// #region DayUse ========================//
 export async function AddDayUse(DayValue: string, Label: string, Color: string) {
   try {
     const response = await axios.post(`${BASE_URL}/api/productAdmin/AddDayUse`, { DayValue, Label, Color });
@@ -109,27 +146,32 @@ export async function AddDayUse(DayValue: string, Label: string, Color: string) 
     return { success: false };
   }
 }
-
 export async function EditDayUse(oldDayValue: string, newDayValue: string, Label: string, Color: string)  {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/EditDayUse`, { oldDayValue, newDayValue, Label, Color });
+    const response = await axios.put(`${BASE_URL}/api/productAdmin/EditDayUse`, { oldDayValue, newDayValue, Label, Color });
     return response.data;
   } catch (error) {
     console.error(`EditDayUse error:`, error);
     return { success: false };
   }
 }
-
 export async function DeleteDayUse(DayValue: string)  {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/DeleteDayUse`, { DayValue });
+    const response = await axios.request({
+      url: `${BASE_URL}/api/productAdmin/DeleteDayUse`,
+      method: "delete",
+      data: { DayValue }
+    });
     return response.data;
   } catch (error) {
     console.error(`DeleteDayUse error:`, error);
     return { success: false };
   }
 }
+// #endregion
 
+
+// #region Frequency ========================//
 export async function AddFrequency(FrequencyValue: string, Label: string, Color: string) {
   try {
     const response = await axios.post(`${BASE_URL}/api/productAdmin/AddFrequency`, { FrequencyValue, Label, Color });
@@ -139,26 +181,65 @@ export async function AddFrequency(FrequencyValue: string, Label: string, Color:
     return { success: false };
   }
 }
-
 export async function EditFrequency(oldFrequencyValue: string, newFrequencyValue: string, Label: string, Color: string) {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/EditFrequency`, { oldFrequencyValue, newFrequencyValue, Label, Color });
+    const response = await axios.put(`${BASE_URL}/api/productAdmin/EditFrequency`, { oldFrequencyValue, newFrequencyValue, Label, Color });
     return response.data;
   } catch (error) {
     console.error(`EditFrequency error:`, error);
     return { success: false };
   }
 }
-
 export async function DeleteFrequency(FrequencyValue: string) {
   try {
-    const response = await axios.post(`${BASE_URL}/api/productAdmin/DeleteFrequency`, { FrequencyValue });
+    const response = await axios.request({
+      url: `${BASE_URL}/api/productAdmin/DeleteFrequency`,
+      method: "delete",
+      data: { FrequencyValue }
+    });
     return response.data;
   } catch (error) {
     console.error(`DeleteFrequency error:`, error);
     return { success: false };
   }
 }
+// #endregion
+
+
+// #region Time ========================//
+export async function AddTime(TimeValue: string, Label: string, Color: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/productAdmin/AddTime`, { TimeValue, Label, Color });
+    return response.data;
+  } catch (error) {
+    console.error(`AddTime error:`, error);
+    return { success: false };
+  }
+}
+export async function EditTime(oldTimeValue: string, newTimeValue: string, Label: string, Color: string) {
+  try {
+    const response = await axios.put(`${BASE_URL}/api/productAdmin/EditTime`, { oldTimeValue, newTimeValue, Label, Color });
+    return response.data;
+  } catch (error) {
+    console.error(`EditTime error:`, error);
+    return { success: false };
+  }
+}
+export async function DeleteTime(TimeValue: string) {
+  try {
+    const response = await axios.request({
+      url: `${BASE_URL}/api/productAdmin/DeleteTime`,
+      method: "delete",
+      data: { TimeValue }
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`DeleteTime error:`, error);
+    return { success: false };
+  }
+}
+// #endregion
+
 
 export async function SaveProduct(data: any): Promise<StatusResponse> {
   try {

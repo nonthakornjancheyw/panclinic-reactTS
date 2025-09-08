@@ -1,18 +1,23 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import Finance from './pages/finance/financePage';
 import Page1 from './pages/Page1';
 import ProductAdminTable from './pages/productAdmin/productAdminPage';
+import LoginPage from './pages/login/LoginPage';
 
 function App() {
-  // state เพื่อเก็บ callback ของ hasUnsavedChanges จาก ProductAdmin
   const [unsavedCheck, setUnsavedCheck] = React.useState<(() => boolean) | undefined>(undefined);
 
   return (
     <Routes>
+      {/* default → ไป login */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
+      <Route path="/login" element={<LoginPage />} />
+
       <Route
-        path="/"
+        path="/finance"
         element={<AppLayout hasUnsavedChanges={unsavedCheck}><Finance /></AppLayout>}
       />
       <Route
@@ -28,7 +33,6 @@ function App() {
         }
       />
     </Routes>
-    
   );
 }
 
