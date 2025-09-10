@@ -42,8 +42,8 @@ function AppLayout({ children, hasUnsavedChanges }: Props) {
   useEffect(() => {
     const isLoggedIn = authen && authen.Info && authen.Info.length > 0;
     if (!isLoggedIn) {
-      message.warning("กรุณาเข้าสู่ระบบก่อน");
-      navigate("/login");
+      // message.warning("กรุณาเข้าสู่ระบบก่อน");
+      // navigate("/login");
     }
   }, []); // run once on mount
 

@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Menu, Checkbox, Button, Table, InputNumber, Select, 
-  Card, Layout,ConfigProvider, Row, Col, Input, Typography, 
-  Divider, Radio, Space
+  Card, Layout, ConfigProvider, Row, Col, Input, Typography, 
+  Divider, Radio, Space, message
 } from 'antd';
 const { Text } = Typography;
 import type { ColumnsType } from 'antd/es/table/interface';
@@ -11,7 +11,7 @@ import { renderCouponOptions, renderActivityOptions } from '../finance/selectOpt
 import { v4 as uuidv4 } from 'uuid';
 import { useStyle } from './styles.ts';
 import './style.css';
-
+import * as financeApi from './financeApi'; 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { registerTHSarabun } from '../../utils/pdfFonts';
@@ -29,6 +29,10 @@ interface Product {
   payment?: string;
   couponType?: string;
   activity?: string;
+  productId?: string;
+  maingroup?: string;
+  brand?: string;
+  cls?: string;
 }
 
 interface ProductItem {
@@ -36,113 +40,237 @@ interface ProductItem {
   name: string;
   price: number;
   discount?: number;
+  maingroup?: string;
+  brand?: string;
+  cls?: string;
 }
 
-const productItemsMap: Record<string, ProductItem[]> = {
-  'Medical-Antihistamine': [
-    { id: '124217', name: 'Zyrtec 10 MG.', price: 25, discount: 0 },
-  ],
-  'Medical-Acne/Antibiotic': [
-    { id: '124218', name: 'CS', price: 2.5, discount: 0 },
-    { id: '124226', name: 'DC 500 mg.(cap)', price: 6, discount: 0 },
-    { id: '124208', name: 'ERY 250 MG.', price: 7, discount: 0 },
-    { id: '124209', name: 'MX 500 MG.', price: 9, discount: 0 },
-    { id: '124201', name: 'Roaccutane 10 MG.', price: 50, discount: 0 },
-    { id: '124202', name: 'Roaccutane 20 MG.', price: 90, discount: 0 },
-    { id: '124204', name: 'TC 250 MG.', price: 6, discount: 0 },
-  ],
-  'Medical-Blemish': [
-    { id: '124203', name: 'Lysene 250 MG.', price: 160 },
-  ],
-  'Supplement-Vitamins': [
-    { id: 'vit1', name: 'Vitamin C', price: 90, discount: 5 },
-    { id: 'vit2', name: 'Vitamin D', price: 100 },
-  ],
-  'Topical-Wilma-Cleanser/Toner': [
-    { id: 'clean1', name: 'Cleanser 1', price: 220 },
-    { id: 'clean2', name: 'Toner 2', price: 180, discount: 15 },
-  ],
-  'Topical-Wilma-Skin Care': [
-    { id: 'skin1', name: 'Skin Care 1', price: 250 },
-  ],
-  'Topical-Wilma-Other': [
-    { id: 'other1', name: 'Other Product 1', price: 110 },
-  ],
-};
+interface MenuItemNode {
+  key: string;
+  label: string;
+  children?: MenuItemNode[];
+}
 
 export default function Finance() {
   const { styles } = useStyle();
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null);
+  const [selectedMenuLabel, setSelectedMenuLabel] = useState<string>('');
   const [selectedAddKeys, setSelectedAddKeys] = useState<string[]>([]);
   const [selectedDeleteKeys, setSelectedDeleteKeys] = useState<React.Key[]>([]);
   const [tableData, setTableData] = useState<Product[]>([]);
-  const [expanded, setExpanded] = useState(false);//พับเปิดปิดcardข้อมูลลูกค้า
+  const [expanded, setExpanded] = useState(false);
 
-  const itemsToShow: ProductItem[] = useMemo(() => {
-    if (!selectedMenuKey) return [];
-    if (productItemsMap[selectedMenuKey]) return productItemsMap[selectedMenuKey];
-    const childrenKeys = Object.keys(productItemsMap).filter(key => key.startsWith(selectedMenuKey + '-'));
-    return childrenKeys.flatMap(key => productItemsMap[key]);
-  }, [selectedMenuKey]);
+  const [itemsToShow, setItemsToShow] = useState<ProductItem[]>([]);
 
   const calculateAmount = (price: number, quantity: number, discount: number) => {
     return price * quantity * (1 - discount / 100);
   };
 
-
-  function handlePrintPDF() {
-    // สร้างเอกสาร PDF
-    const doc = new jsPDF();
-    registerTHSarabun(doc);
-
-    // ทดสอบพิมพ์ข้อความเบื้องต้น
-    doc.text('ทดสอบ PDF', 10, 10);
-
-    // เตรียมหัวตารางและข้อมูล
-    const headers = ['ชื่อสินค้า', 'จำนวน', 'ราคา', 'ส่วนลด', 'ราคารวม'];
-    const data = tableData.map(item => [
-      item.name,
-      item.quantity.toString(),
-      item.price.toFixed(2),
-      item.discount.toFixed(2),
-      item.amount.toFixed(2),
-    ]);
-
-    // ตั้งค่าฟอนต์สำหรับตารางอีกครั้งเพื่อให้แน่ใจว่าใช้ฟอนต์ไทย
-    doc.setFont('THSarabunNew', 'normal');
-
-    // สร้างตารางด้วย autoTable function (ใช้ fontStyle ปกติ)
-    autoTable(doc, {
-      head: [headers],
-      body: data,
-      styles: {
-        font: 'THSarabunNew',
-        fontStyle: 'normal',
-        fontSize: 16,
-      },
-      headStyles: {
-        fontStyle: 'normal', // เปลี่ยนเป็น normal เพราะยังไม่มีฟอนต์ bold
-      },
-      startY: 20,
-    });
-
-    // แทนการ save ให้เปิด PDF ในแท็บใหม่ และสั่งพิมพ์อัตโนมัติ
-    const pdfBlob = doc.output('blob');
-    const url = URL.createObjectURL(pdfBlob);
-    const printWindow = window.open(url);
-    if (printWindow) {
-      printWindow.focus();
-      // เมื่อโหลดเสร็จสั่งพิมพ์
-      printWindow.onload = () => {
-        printWindow.print();
-        // ปิดแท็บหลังพิมพ์ (ถ้าต้องการ)
-        // printWindow.close();
-      };
-    } else {
-      console.error('ไม่สามารถเปิดหน้าต่างพิมพ์ได้');
-    }
+  const [menuItems, setMenuItems] = useState<MenuItemNode[]>([]);
+  function buildMenuTree(flatMenu: any[], parentId: number = 1): MenuItemNode[] {
+    return flatMenu
+      .filter((item: any) => item.ParentID === parentId)
+      .sort((a: any, b: any) => (a.Priority ?? 9999) - (b.Priority ?? 9999))
+      .map((item: any) => {
+        const children: MenuItemNode[] = buildMenuTree(flatMenu, item.MenuID);
+        return {
+          key: `${item.MenuID}_${item.HRef ?? ''}`,
+          label: item.Text,
+          children: children.length > 0 ? children : undefined,
+          href: item.HRef,
+        };
+      });
   }
 
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const data = await financeApi.GetMenu();
+        const arr = Array.isArray(data) ? data : [];
+        const tree = buildMenuTree(arr, 1);
+        setMenuItems(tree);
+      } catch (err) {
+        message.error("ไม่สามารถโหลดเมนูได้ > " + err);
+      }
+    };
+    fetchMenu();
+  }, []);
+
+  function handlePrintPDF() {
+  if (!customerData) {
+    message.warning('กรุณาค้นหาลูกค้าก่อนพิมพ์ใบเสร็จ');
+    return;
+  }
+  if (tableData.length === 0) {
+    message.warning('ไม่มีรายการสินค้า');
+    return;
+  }
+
+  const doc = new jsPDF();
+  registerTHSarabun(doc);
+
+  // Header
+  doc.setFont('THSarabunNew', 'bold');
+  doc.setFontSize(22);
+  doc.text('ใบเสร็จรับเงิน', 105, 18, { align: 'center' });
+
+  doc.setFontSize(16);
+  doc.setFont('THSarabunNew', 'normal');
+  let y = 30;
+  doc.text(`OPD: ${customerData.CustomerID || '-'}`, 14, y);
+  doc.text(`ชื่อ-สกุล: ${customerData.Name || '-'}`, 80, y);
+  doc.text(`ประเภทสมาชิก: ${customerData.MemTypeName || '-'}`, 150, y);
+
+  y += 8;
+  doc.text(`วันที่หมดอายุ: ${customerData.ExpirationDate || '-'}`, 14, y);
+
+  y += 10;
+
+  // Table
+  const headers = [
+    { content: 'ลำดับ', styles: { halign: 'center' as const } },
+    { content: 'ชื่อสินค้า', styles: { halign: 'center' as const } },
+    { content: 'จำนวน', styles: { halign: 'center' as const } },
+    { content: 'ราคา/หน่วย', styles: { halign: 'center' as const } },
+    { content: 'ส่วนลด (%)', styles: { halign: 'center' as const } },
+    { content: 'ราคารวม', styles: { halign: 'center' as const } },
+  ];
+  const data = tableData.map((item, idx) => [
+    idx + 1,
+    item.name,
+    item.quantity,
+    item.price.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+    item.discount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+    item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+  ]);
+
+  autoTable(doc, {
+    head: [headers], // ต้องเป็น array 2 ชั้น
+    body: data,
+    startY: y,
+    theme: 'grid',
+    styles: {
+      font: 'THSarabunNew',
+      fontSize: 16,
+      textColor: [0, 0, 0],
+      lineColor: [0, 0, 0],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: [0, 0, 0],
+      fontStyle: 'bold',
+    },
+    bodyStyles: {
+      fillColor: [255, 255, 255],
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 16 },
+      1: { cellWidth: 60 },
+      2: { halign: 'center', cellWidth: 20 },
+      3: { halign: 'right', cellWidth: 28 },
+      4: { halign: 'right', cellWidth: 28 },
+      5: { halign: 'right', cellWidth: 32 },
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  // Total
+  const total = tableData.reduce((sum, item) => sum + item.amount, 0);
+  // ใช้ as any เพื่อให้ผ่าน type
+  const finalY = (doc as any).lastAutoTable?.finalY || y + 30;
+  doc.setFontSize(18);
+  doc.setFont('THSarabunNew', 'bold');
+  doc.text(
+    `รวมเป็นเงิน: ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })} บาท`,
+    200,
+    finalY + 12,
+    { align: 'right' }
+  );
+
+  // Footer
+  doc.setFontSize(14);
+  doc.setFont('THSarabunNew', 'normal');
+  doc.text('*** ขอบคุณที่ใช้บริการ ***', 105, finalY + 28, { align: 'center' });
+
+  // แสดง/พิมพ์
+  const pdfBlob = doc.output('blob');
+  const url = URL.createObjectURL(pdfBlob);
+  const printWindow = window.open(url);
+  if (printWindow) {
+    printWindow.focus();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  } else {
+    message.error('ไม่สามารถเปิดหน้าต่างพิมพ์ได้');
+  }
+}
+
+  const [customerIdInput, setCustomerIdInput] = useState('');
+  const [customerData, setCustomerData] = useState<any>(null);
+  // เพิ่มฟังก์ชันสำหรับกด OK
+  const handleGetCustomer = async () => {
+    if (!customerIdInput.trim()) {
+      message.warning('กรุณากรอก OPD');
+      return;
+    }
+
+    try {
+      const result = await financeApi.GetCustomer(customerIdInput.trim());
+
+      if (Array.isArray(result) && result.length > 0) {
+        message.success('ค้นหาข้อมูลลูกค้าสำเร็จ');
+        setCustomerData(result[0]); 
+        console.log('Customer Data:', result[0]);
+      } else {
+        setCustomerData(null);
+        message.error('ไม่พบข้อมูลลูกค้า');
+      }
+    } catch (err) {
+      console.error('GetCustomer Error:', err);
+      message.error('เกิดข้อผิดพลาดในการค้นหาลูกค้า');
+    }
+  };
+  useEffect(() => {
+    console.log('555>', customerData);
+  }, [customerData]);
+
+  const handleMenuClick = async (e: any) => {
+    setSelectedMenuKey(e.key);
+
+    // ใช้ innerText แทน info.item เพื่อรองรับอนาคต
+    let label = '';
+    if (e.domEvent && e.domEvent.currentTarget && e.domEvent.currentTarget.innerText) {
+      label = e.domEvent.currentTarget.innerText;
+    }
+    setSelectedMenuLabel(label);
+
+    setSelectedAddKeys([]);
+    const [, href] = e.key.split('_');
+    if (href) {
+      const [maingroup, brand, cls] = href.split(',');
+      try {
+        const items = await financeApi.GetProduct(href, maingroup, brand, cls);
+        const mapped = (Array.isArray(items) ? items : []).map((item: any) => ({
+          id: item.ProductID,
+          name: item.Name,
+          price: item.Price,
+          discount: 0,
+          maingroup,
+          brand,
+          cls,
+        }));
+        setItemsToShow(mapped);
+      } catch (err) {
+        message.error('โหลดข้อมูลสินค้าไม่สำเร็จ');
+        setItemsToShow([]);
+      }
+    } else {
+      setItemsToShow([]);
+    }
+  };
+  
   const handleAddSelected = () => {
     const newProducts: Product[] = itemsToShow
       .filter(item => selectedAddKeys.includes(item.id))
@@ -160,121 +288,278 @@ export default function Finance() {
           payment: 'M',
           couponType: '',
           activity: '',
+          productId: item.id,
+          maingroup: item.maingroup,
+          brand: item.brand,
+          cls: item.cls,     
         };
       });
     setTableData(prev => [...prev, ...newProducts]);
     setSelectedAddKeys([]);
   };
 
-  const menuItems = [
-    {
-      key: 'Medical',
-      // icon: <MailOutlined />,
-      label: 'Medical',
-      children: [
-        {
-          key: 'Medical-Antihistamine',
-          label: 'Antihistamine',
-        },
-        {
-          key: 'Medical-Acne/Antibiotic',
-          label: 'Acne/Antibiotic',
-        },
-        {
-          key: 'Medical-Blemish',
-          label: 'Blemish',
-        },
-      ],
-    },
-    {
-      key: 'Supplement',
-      label: 'Supplement',
-      children: [
-        {
-          key: 'Supplement-Vitamins',
-          label: 'Vitamins',
-        },
-      ],
-    },
-    {
-      key: 'Topical',
-      label: 'Topical',
-      children: [
-        {
-          key: 'Topical-Wilma',
-          label: (
-            <span
-              onClick={() => {
-                setSelectedMenuKey('Topical-Wilma');
-                setSelectedAddKeys([]);
-              }}
-            >
-              Wilma
-            </span>
-          ),
-          children: [
-            {
-              key: 'Topical-Wilma-Cleanser/Toner',
-              label: 'Cleanser/Toner',
-            },
-            {
-              key: 'Topical-Wilma-Skin Care',
-              label: 'Skin Care',
-            },
-            {
-              key: 'Topical-Wilma-Other',
-              label: 'Other',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      key: 'Procedure',
-      label: 'Procedure',
-    },
-    {
-      key: 'Service',
-      label: 'Service',
-    },
-    {
-      key: 'Treatment',
-      label: 'Treatment',
-    },
-    { key: 'คูปองชุดเล็ก', label: 'คูปองชุดเล็ก' },
-    { key: 'คูปองชุดใหญ่', label: 'คูปองชุดใหญ่' },
-    { key: 'คูปองฟรี', label: 'คูปองฟรี' },
-    { key: 'คูปอง 1 ครั้ง', label: 'คูปอง 1 ครั้ง' },
-    { key: 'คูปองส่วนลด', label: 'คูปองส่วนลด' },
-    { key: 'วัสดุบริการ', label: 'วัสดุบริการ' },
-    { key: 'Make up', label: 'Make up' },
-    { key: 'ส่งเสริมการขาย', label: 'ส่งเสริมการขาย' },
-    { key: 'Other', label: 'Other' },
-    { key: 'Hya-Pluryal', label: 'Hya-Pluryal' },
-    { key: 'Rejuran', label: 'Rejuran' },
-    { key: 'MM', label: 'MM' },
-    { key: 'MS', label: 'MS' },
-    { key: 'EPN-TC-S,HMPF', label: 'EPN-TC-S,HMPF' },
-    { key: 'Pro-DooDee', label: 'Pro-DooDee' },
-    { key: 'Advanced Lift', label: 'Advanced Lift' },
-    { key: 'Pro-Gowabi', label: 'Pro-Gowabi' },
-    { key: 'VIP-Destination', label: 'VIP-Destination' },
-    { key: 'BIM Mask-ปกติ', label: 'BIM Mask-ปกติ' },
-    { key: 'Pro-Age Reverse', label: 'Pro-Age Reverse' },
-    { key: 'Pro-MidYear', label: 'Pro-MidYear' },
-    { key: 'Pro-ตัดแต้ม', label: 'Pro-ตัดแต้ม' },
-    
-  ];
+  const handleSave = async () => {
+    try {
+      // 1. customerID
+      console.log('customerData', customerData);
+      if (!customerData || !customerData.CustomerID) {
+        message.warning("กรุณาค้นหาและเลือกลูกค้าที่ถูกต้องก่อนทำการบันทึก");
+        return;
+      }
+      const customerID = customerData.CustomerID;
+      // 2. ยอดเงินทั้งหมด
+      const allTotal = totalCash;
 
+      // 3. productDetail (คือ tableData)
+      const productDetail = tableData.map(item => ({
+        productId: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        discount: item.discount,
+        total: item.amount, 
+        maingroup: item.maingroup,
+        brand: item.brand,
+        class: item.cls,
+      }));
+      if (productDetail.length === 0) {
+        message.warning("กรุณาเลือกรายการสินค้า/บริการก่อนทำการบันทึก");
+        return;
+      }
+
+      // 4. paymentDetail (list ตามช่องที่ติ๊ก)
+      const paymentDetail: any[] = [];
+
+      if (cashChecked && Number(cashValue) > 0) {
+        paymentDetail.push({
+          type: 'เงินสด',
+          amount: Number(cashValue),
+        });
+      }
+      if (creditChecked && (Number(creditValues.value1) > 0 || Number(creditValues.value2) > 0)) {
+        const cards = [];
+        if (Number(creditValues.value1) > 0) {
+          cards.push({
+            cardNo: 1,
+            card: creditCardTypes.card1,
+            amount: Number(creditValues.value1),
+          });
+        }
+        if (Number(creditValues.value2) > 0) {
+          cards.push({
+            cardNo: 2,
+            card: creditCardTypes.card2,
+            amount: Number(creditValues.value2),
+          });
+        }
+        paymentDetail.push({
+          type: 'บัตรเครดิต',
+          payType: creditPaymentType,
+          cards,
+        });
+      }
+      if (welfareChecked && Number(welfareValue) > 0) {
+        paymentDetail.push({
+          type: 'หักสวัสดิการ',
+          amount: Number(welfareValue),
+        });
+      }
+      if (salaryChecked && Number(salaryValue) > 0) {
+        paymentDetail.push({
+          type: 'หักเงินเดือน',
+          amount: Number(salaryValue),
+        });
+      }
+      if (voucherChecked && (Number(voucherValue.value1) > 0 || Number(voucherValue.value2) > 0)) {
+        const cards = [];
+        if (Number(voucherValue.value1) > 0) {
+          cards.push({
+            cardNo: 1,
+            card: voucherCardTypes.card1,
+            amount: Number(voucherValue.value1),
+          });
+        }
+        if (Number(voucherValue.value2) > 0) {
+          cards.push({
+            cardNo: 2,
+            card: voucherCardTypes.card2,
+            amount: Number(voucherValue.value2),
+          });
+        }
+        paymentDetail.push({
+          type: 'Voucher',
+          cards,
+        });
+      }
+      if (couponChecked && Number(couponValue) > 0) {
+        paymentDetail.push({
+          type: 'คูปองแพนบิวตี้แคร์',
+          amount: Number(couponValue),
+        });
+      }
+      if (evoucherChecked && Number(evoucherValue) > 0) {
+        paymentDetail.push({
+          type: 'E-Voucher KBank',
+          amount: Number(evoucherValue),
+        });
+      }
+      if (ewalletChecked && Number(ewalletValue) > 0) {
+        paymentDetail.push({
+          type: 'E-Wallet (QR Code)',
+          amount: Number(ewalletValue),
+        });
+      }
+      if (transferChecked && Number(transferValue) > 0) {
+        paymentDetail.push({
+          type: 'เงินโอน(Online)',
+          bank: transferCardTypes,
+          amount: Number(transferValue),
+        });
+      }
+      if (lineCreditChecked && Number(lineCreditValue) > 0) {
+        paymentDetail.push({
+          type: 'บัตรเครดิต(LinePBC)',
+          bank: lineCreditCardTypes,
+          amount: Number(lineCreditValue),
+        });
+      }
+      const res = await financeApi.SaveReceipt(customerID, allTotal, paymentDetail, productDetail) as any;
+      if (res && res.success) {
+        message.success('บันทึกข้อมูลสำเร็จ');
+        handlePrintPDF();
+        reset();
+      } else {
+        message.error('บันทึกข้อมูลไม่สำเร็จ');
+      }
+    } catch (err) {
+      message.error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    }
+  };
+
+  const reset = () => {
+    setTableData([]);
+    setSelectedAddKeys([]);
+    setSelectedDeleteKeys([]);
+    setCustomerIdInput('');
+    setCustomerData(null);
+    setCashChecked(false);
+    setCashValue('0');
+    setCreditChecked(false);
+    setCreditValue({ value1: '0', value2: '0' });
+    setCreditCardTypes({ card1: '-', card2: '-' });
+    setCreditPaymentType('เต็มจำนวน');
+    setWelfareChecked(false);
+    setWelfareValue('0');
+    setSalaryChecked(false);
+    setSalaryValue('0');
+    setVoucherChecked(false);
+    setVoucherValue({ value1: '0', value2: '0' });
+    setVoucherCardTypes({ card1: '-', card2: '-' });
+    setCouponChecked(false);
+    setCouponValue('0');
+    setEvoucherChecked(false);
+    setEvoucherValue('0');
+    setEwalletChecked(false);
+    setEwalletValue('0');
+    setTransferChecked(false);
+    setTransferValue('0');
+    setTransferCardTypes('-');
+    setLineCreditChecked(false);
+    setLineCreditValue('0');
+    setLineCreditCardTypes('-');
+    setSelectedMenuKey(null);
+    setSelectedMenuLabel('');
+    setItemsToShow([]);
+    setValue('');
+    setConsultOption('');
+  };
+  
   const totalCash = useMemo(() => {
     return tableData.reduce((sum, item) => sum + item.amount, 0);
   }, [tableData]);
 
+  // 1. Default ติ๊กเงินสด และใส่ค่า totalCash
+  useEffect(() => {
+    setCashChecked(true);
+    setCashValue(totalCash.toString());
+  }, [totalCash]);
+
+  // เงินสด
+  const handleCashChecked = (checked: boolean) => {
+    setCashChecked(checked);
+    setCashValue(checked ? totalCash.toString() : '0');
+  };
+
+  // บัตรเครดิต
+  const handleCreditChecked = (checked: boolean) => {
+    setCreditChecked(checked);
+    setCreditValue({
+      value1: checked ? totalCash.toString() : '0',
+      value2: '0',
+    });
+    setCreditCardTypes({ card1: '-', card2: '-' });
+    setCreditPaymentType('เต็มจำนวน');
+  };
+
+  // หักสวัสดิการ
+  const handleWelfareChecked = (checked: boolean) => {
+    setWelfareChecked(checked);
+    setWelfareValue(checked ? totalCash.toString() : '0');
+  };
+
+  // หักเงินเดือน
+  const handleSalaryChecked = (checked: boolean) => {
+    setSalaryChecked(checked);
+    setSalaryValue(checked ? totalCash.toString() : '0');
+  };
+
+  // Voucher
+  const handleVoucherChecked = (checked: boolean) => {
+    setVoucherChecked(checked);
+    setVoucherValue({
+      value1: checked ? totalCash.toString() : '0',
+      value2: '0',
+    });
+    setVoucherCardTypes({ card1: '-', card2: '-' });
+  };
+
+  // คูปองแพนบิวตี้แคร์
+  const handleCouponChecked = (checked: boolean) => {
+    setCouponChecked(checked);
+    setCouponValue(checked ? totalCash.toString() : '0');
+  };
+
+  // E-Voucher KBank
+  const handleEvoucherChecked = (checked: boolean) => {
+    setEvoucherChecked(checked);
+    setEvoucherValue(checked ? totalCash.toString() : '0');
+  };
+
+  // E-Wallet (QR Code)
+  const handleEwalletChecked = (checked: boolean) => {
+    setEwalletChecked(checked);
+    setEwalletValue(checked ? totalCash.toString() : '0');
+  };
+
+  // เงินโอน(Online)
+  const handleTransferChecked = (checked: boolean) => {
+    setTransferChecked(checked);
+    setTransferValue(checked ? totalCash.toString() : '0');
+    setTransferCardTypes('-');
+  };
+
+  // บัตรเครดิต(LinePBC)
+  const handleLineCreditChecked = (checked: boolean) => {
+    setLineCreditChecked(checked);
+    setLineCreditValue(checked ? totalCash.toString() : '0');
+    setLineCreditCardTypes('-');
+  };
+
   const columns: ColumnsType<Product> = [
-    { 
-      title: <div style={{ textAlign: 'center' }}>ชื่อสินค้า</div>, 
-      dataIndex: 'name', 
-      width: 200 
+    {
+      title: <div style={{ textAlign: 'center' }}>ชื่อสินค้า</div>,
+      dataIndex: 'name',
+      width: 200
     },
     {
       title: <div style={{ textAlign: 'center' }}>จำนวน</div>,
@@ -369,12 +654,6 @@ export default function Finance() {
         </Select>
       ),
     },
-    // {
-    //   title: 'ราคา',
-    //   dataIndex: 'price',
-    //   width: 100,
-    //   render: value => `${value} บาท`,
-    // },
     {
       title: <div style={{ textAlign: 'center' }}>รวม</div>,
       dataIndex: 'amount',
@@ -385,13 +664,12 @@ export default function Finance() {
         </div>
       ),
     },
-
   ];
 
   const milestone2 = ['M Plus Forte', 'Melaslin', 'VB Block', 'Sunscreen'];
 
   
- const [cashChecked, setCashChecked] = useState(false);
+  const [cashChecked, setCashChecked] = useState(false);
   const [cashValue, setCashValue] = useState('0');
 
   const [creditChecked, setCreditChecked] = useState(false);
@@ -445,7 +723,8 @@ export default function Finance() {
   // const handleChange = (value: string) => {
   //   console.log(`selected ${value}`);
   // };
-  
+
+
   return (
   <Layout style={{ minHeight: '100vh', padding: 10 }}>
     <Row>
@@ -457,10 +736,7 @@ export default function Finance() {
               mode="vertical" //inline
               selectedKeys={selectedMenuKey ? [selectedMenuKey] : []}
               items={menuItems}
-              onClick={(e) => {
-                setSelectedMenuKey(e.key);
-                setSelectedAddKeys([]);
-              }}
+              onClick={handleMenuClick}
               style={{ 
                 height: '100%', overflowY: 'auto',
                 borderRadius: 8, 
@@ -484,9 +760,8 @@ export default function Finance() {
               }}
             >
               <h3 style={{ marginBottom: 16 }}>
-                {selectedMenuKey || 'กรุณาเลือกหมวดหมู่สินค้า'}
+                {selectedMenuLabel || 'กรุณาเลือกหมวดหมู่สินค้า'}
               </h3>
-
               <div style={{ flexGrow: 1, overflowY: 'auto' }}>
                 {itemsToShow.length === 0 && <p>-</p>}
                 {itemsToShow.map(item => (
@@ -529,9 +804,27 @@ export default function Finance() {
                   <Card>
                     <Row gutter={[4, 4]} align="middle" style={{ marginBottom: 8 }}>
                       <Col><Text strong>OPD :</Text></Col>
-                      <Col><Input size="small" /></Col>
+                      <Col>
+                        <Input
+                          size="small"
+                          value={customerIdInput}
+                          onChange={e => setCustomerIdInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              handleGetCustomer();
+                            }
+                          }}
+                        />
+                      </Col>
                       <Col style={{marginRight:20}}>
-                        <Button size="small" type="primary" shape="round">OK</Button>
+                        <Button
+                          size="small"
+                          type="primary"
+                          shape="round"
+                          onClick={handleGetCustomer}
+                        >
+                          OK
+                        </Button>
                       </Col>
                       <Col>
                         <Select size="small" defaultValue="TT002 49TT0714 ปวีณา(Test) คชเสน" style={{ width: '100%' }}>
@@ -545,19 +838,31 @@ export default function Finance() {
                     <Row gutter={[8, 0]} >
                       <Col span={8}>
                         <Text strong>ชื่อ-สกุล : </Text>
-                        <Text>ปวีณา(Test) คชเสน</Text>
+                        <Text>{customerData?.Name}</Text>
                       </Col>
                       <Col span={8}>
                         <Text strong>ประเภทสมาชิก : </Text>
-                        <Text>Titanium Card</Text>
+                        <Text>{customerData?.MemTypeName || '-'}</Text>
                       </Col>
                       <Col span={8}>
                         <Text strong>วันที่หมดอายุ : </Text>
-                        <Text style={{ color: 'red' }}>23/02/2025</Text>
+                        <Text style={{
+                          color: customerData?.ExpirationDate && new Date(customerData.ExpirationDate) < new Date() ? 'red' : 'black'
+                        }}>
+                          {customerData?.ExpirationDate
+                            ? (() => {
+                                const d = new Date(customerData.ExpirationDate.replace(/-/g, '/'));
+                                const y = d.getFullYear();
+                                const m = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                return `${day}/${m}/${y}`; // 👉 แสดงเป็น วัน/เดือน/ปี
+                              })()
+                            : '-'}
+                        </Text>
                       </Col>
                       <Col span={8}>
                         <Text strong>สิทธิ์ BirthDay : </Text>
-                        <Text>-</Text>
+                        <Text>{customerData?.StatusBirthdaySpecial || '-'}</Text>
                       </Col>
                       <Col span={8}>
                         <Text strong>แพ้ยา(Allergy) : </Text>
@@ -697,7 +1002,7 @@ export default function Finance() {
                 />
                 <Row style={{ marginTop: 16, fontWeight: 'bold' }}> {/* justify="end" */} 
                   <Col>
-                    เงินสดรวม: {totalCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                    รวมเป็นเงิน: {totalCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
                   </Col>
                 </Row>
                 <Row style={{ marginTop: 16, fontWeight: 'bold' }}>
@@ -705,14 +1010,12 @@ export default function Finance() {
                     การชำระเงิน
                   </Col>
                 </Row>
+
                 <Row gutter={8} style={{ marginBottom: 8 }}>
                   <Col md={4}>
                     <Checkbox
                       checked={cashChecked}
-                      onChange={(e) => {
-                        setCashChecked(e.target.checked);
-                        if (!e.target.checked) setCashValue('0');
-                      }}
+                      onChange={e => handleCashChecked(e.target.checked)}
                     >
                       เงินสด
                     </Checkbox>
@@ -733,15 +1036,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={creditChecked}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setCreditChecked(checked);
-                        if (!checked) {
-                          setCreditValue({ value1: '0', value2: '0' });
-                          setCreditCardTypes({ card1: '-', card2: '-' });
-                          setCreditPaymentType('เต็มจำนวน');
-                        }
-                      }}
+                      onChange={e => handleCreditChecked(e.target.checked)}
                     >
                       บัตรเครดิต
                     </Checkbox>
@@ -799,7 +1094,6 @@ export default function Finance() {
                   <Col>
                     <span style={{ lineHeight: '28px' }}>ใบที่ 2</span>
                   </Col>
-
                   <Col>
                     <Select
                       value={creditCardTypes.card2}
@@ -815,7 +1109,6 @@ export default function Finance() {
                       ]}
                     />
                   </Col>
-
                   <Col>
                     <Input
                       type="number"
@@ -836,10 +1129,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={welfareChecked}
-                      onChange={(e) => {
-                        setWelfareChecked(e.target.checked);
-                        if (!e.target.checked) setWelfareValue('0');
-                      }}
+                      onChange={e => handleWelfareChecked(e.target.checked)}
                     >
                       หักสวัสดิการ
                     </Checkbox>
@@ -860,10 +1150,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={salaryChecked}
-                      onChange={(e) => {
-                        setSalaryChecked(e.target.checked);
-                        if (!e.target.checked) setSalaryValue('0');
-                      }}
+                      onChange={e => handleSalaryChecked(e.target.checked)}
                     >
                       หักเงินเดือน
                     </Checkbox>
@@ -880,31 +1167,11 @@ export default function Finance() {
                   </Col>
                 </Row>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
                 <Row gutter={8} style={{ marginBottom: 8 }}>
                   <Col md={4}>
                     <Checkbox
                       checked={voucherChecked}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setVoucherChecked(checked);
-                        if (!checked) {
-                          setVoucherValue({ value1: '0', value2: '0' });
-                          setVoucherCardTypes({ card1: '-', card2: '-' });
-                        }
-                      }}
+                      onChange={e => handleVoucherChecked(e.target.checked)}
                     >
                       Voucher
                     </Checkbox>
@@ -979,22 +1246,11 @@ export default function Finance() {
 
                 </Row>
 
-
-
-
-
-
-
-
-
                 <Row gutter={8} style={{ marginBottom: 8 }}>
                   <Col md={4}>
                     <Checkbox
                       checked={couponChecked}
-                      onChange={(e) => {
-                        setCouponChecked(e.target.checked);
-                        if (!e.target.checked) setCouponValue('0');
-                      }}
+                      onChange={e => handleCouponChecked(e.target.checked)}
                     >
                       คูปองแพนบิวตี้แคร์
                     </Checkbox>
@@ -1015,10 +1271,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={evoucherChecked}
-                      onChange={(e) => {
-                        setEvoucherChecked(e.target.checked);
-                        if (!e.target.checked) setEvoucherValue('0');
-                      }}
+                      onChange={e => handleEvoucherChecked(e.target.checked)}
                     >
                       E-Voucher KBank
                     </Checkbox>
@@ -1039,10 +1292,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={ewalletChecked}
-                      onChange={(e) => {
-                        setEwalletChecked(e.target.checked);
-                        if (!e.target.checked) setEwalletValue('0');
-                      }}
+                      onChange={e => handleEwalletChecked(e.target.checked)}
                     >
                       E-Wallet (QR Code)
                     </Checkbox>
@@ -1063,10 +1313,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={transferChecked}
-                      onChange={(e) => {
-                        setTransferChecked(e.target.checked);
-                        if (!e.target.checked) setTransferValue('0');
-                      }}
+                      onChange={e => handleTransferChecked(e.target.checked)}
                     >
                       เงินโอน(Online)
                     </Checkbox>
@@ -1106,10 +1353,7 @@ export default function Finance() {
                   <Col md={4}>
                     <Checkbox
                       checked={lineCreditChecked}
-                      onChange={(e) => {
-                        setLineCreditChecked(e.target.checked);
-                        if (!e.target.checked) setLineCreditValue('0');
-                      }}
+                      onChange={e => handleLineCreditChecked(e.target.checked)}
                     >
                       บัตรเครดิต(LinePBC)
                     </Checkbox>
@@ -1218,7 +1462,17 @@ export default function Finance() {
                   </Col>
                 </Row>
                 <Divider style={{ borderColor: '#7cb305' }}>Solid</Divider>
-
+                <Row gutter={8} style={{ marginBottom: 8 }}>
+                    <Button
+                      type="primary"
+                      onClick={handleSave}
+                      size="small"
+                      style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }}
+                    >
+                      บันทึก
+                    </Button>
+                </Row>
+                    
               </Card>
 
               
