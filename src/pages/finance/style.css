@@ -1,9 +1,9 @@
 .text-label {
-  font-weight: 600;
+  font-weight: 600!important;
 }
 
 .ant-menu-submenu-popup {
-  font-size: 12px !important;
+  font-size: 12px important;
 }
 
 /* มีปัญหาอยู่ .ant-menu-submenu-popup มันแก้ที่ ant กระทบทั้งหมด */
@@ -11,9 +11,38 @@
 .compact-menu .ant-menu-submenu-title,
 .ant-menu-submenu-popup .ant-menu-item,
 .ant-menu-submenu-popup .ant-menu-submenu-title {
-  padding: 4px 12px !important;
+  padding: 4px 12px important;
   height: auto !important;
   line-height: 1.2 !important;
   min-height: 24px !important;
 }
 
+.delete-btn {
+  background-image: linear-gradient(-60deg, #f5413e 0%, #f57775 100%) !important; 
+  color: #fff !important;
+  border-radius: 7px!important;
+  padding: 0 10px!important;
+  height: 28px!important;
+  line-height: 28px!important;
+  border: none!important;
+  transition: background 0.3s!important;
+}
+
+.delete-btn:hover {
+  background-image: linear-gradient(-60deg, #e01c19 0%, rgb(236, 115, 115) 100%) !important;
+}
+
+.export-btn {
+  background-image: linear-gradient(-60deg, #ff5858 0%, #f09819 100%) !important; 
+  color: #fff !important;
+  border-radius: 7px!important;
+  padding: 0 10px!important;
+  height: 28px!important;
+  line-height: 28px!important;
+  border: none!important;
+  transition: background 0.3s!important;
+}
+
+.export-btn:hover {
+  background-image: linear-gradient(-60deg, #fa4545 0%, #eb8b05 100%) !important;
+}

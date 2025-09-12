@@ -6,15 +6,14 @@ import {
 } from 'antd';
 const { Text } = Typography;
 import type { ColumnsType } from 'antd/es/table/interface';
-import { PlusOutlined, MinusOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { PlusOutlined, MinusOutlined, DownOutlined, UpOutlined, 
+  FilePdfOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { renderCouponOptions, renderActivityOptions } from '../finance/selectOptions';
 import { v4 as uuidv4 } from 'uuid';
 import { useStyle } from './styles.ts';
 import './style.css';
 import * as financeApi from './financeApi'; 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { registerTHSarabun } from '../../utils/pdfFonts';
+import { generateFinancePDF } from '../../utils/generateFinancePDF';
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -97,115 +96,30 @@ export default function Finance() {
   }, []);
 
   function handlePrintPDF() {
-  if (!customerData) {
-    message.warning('กรุณาค้นหาลูกค้าก่อนพิมพ์ใบเสร็จ');
-    return;
+    try {
+      // เรียกฟังก์ชัน generateFinancePDF เพื่อสร้าง PDF
+      const doc = generateFinancePDF(customerData, tableData);
+
+      // แสดง/พิมพ์ PDF
+      const pdfBlob = doc.output('blob');
+      const url = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(url);
+      if (printWindow) {
+        printWindow.focus();
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      } else {
+        message.error('ไม่สามารถเปิดหน้าต่างพิมพ์ได้');
+      }
+
+    } catch (err: any) {
+      // ถ้าไม่มีข้อมูล หรือ tableData ว่าง
+      message.warning(err.message);
+    }
   }
-  if (tableData.length === 0) {
-    message.warning('ไม่มีรายการสินค้า');
-    return;
-  }
 
-  const doc = new jsPDF();
-  registerTHSarabun(doc);
 
-  // Header
-  doc.setFont('THSarabunNew', 'bold');
-  doc.setFontSize(22);
-  doc.text('ใบเสร็จรับเงิน', 105, 18, { align: 'center' });
-
-  doc.setFontSize(16);
-  doc.setFont('THSarabunNew', 'normal');
-  let y = 30;
-  doc.text(`OPD: ${customerData.CustomerID || '-'}`, 14, y);
-  doc.text(`ชื่อ-สกุล: ${customerData.Name || '-'}`, 80, y);
-  doc.text(`ประเภทสมาชิก: ${customerData.MemTypeName || '-'}`, 150, y);
-
-  y += 8;
-  doc.text(`วันที่หมดอายุ: ${customerData.ExpirationDate || '-'}`, 14, y);
-
-  y += 10;
-
-  // Table
-  const headers = [
-    { content: 'ลำดับ', styles: { halign: 'center' as const } },
-    { content: 'ชื่อสินค้า', styles: { halign: 'center' as const } },
-    { content: 'จำนวน', styles: { halign: 'center' as const } },
-    { content: 'ราคา/หน่วย', styles: { halign: 'center' as const } },
-    { content: 'ส่วนลด (%)', styles: { halign: 'center' as const } },
-    { content: 'ราคารวม', styles: { halign: 'center' as const } },
-  ];
-  const data = tableData.map((item, idx) => [
-    idx + 1,
-    item.name,
-    item.quantity,
-    item.price.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-    item.discount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-    item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-  ]);
-
-  autoTable(doc, {
-    head: [headers], // ต้องเป็น array 2 ชั้น
-    body: data,
-    startY: y,
-    theme: 'grid',
-    styles: {
-      font: 'THSarabunNew',
-      fontSize: 16,
-      textColor: [0, 0, 0],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: [0, 0, 0],
-      fontStyle: 'bold',
-    },
-    bodyStyles: {
-      fillColor: [255, 255, 255],
-    },
-    columnStyles: {
-      0: { halign: 'center', cellWidth: 16 },
-      1: { cellWidth: 60 },
-      2: { halign: 'center', cellWidth: 20 },
-      3: { halign: 'right', cellWidth: 28 },
-      4: { halign: 'right', cellWidth: 28 },
-      5: { halign: 'right', cellWidth: 32 },
-    },
-    margin: { left: 14, right: 14 },
-  });
-
-  // Total
-  const total = tableData.reduce((sum, item) => sum + item.amount, 0);
-  // ใช้ as any เพื่อให้ผ่าน type
-  const finalY = (doc as any).lastAutoTable?.finalY || y + 30;
-  doc.setFontSize(18);
-  doc.setFont('THSarabunNew', 'bold');
-  doc.text(
-    `รวมเป็นเงิน: ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })} บาท`,
-    200,
-    finalY + 12,
-    { align: 'right' }
-  );
-
-  // Footer
-  doc.setFontSize(14);
-  doc.setFont('THSarabunNew', 'normal');
-  doc.text('*** ขอบคุณที่ใช้บริการ ***', 105, finalY + 28, { align: 'center' });
-
-  // แสดง/พิมพ์
-  const pdfBlob = doc.output('blob');
-  const url = URL.createObjectURL(pdfBlob);
-  const printWindow = window.open(url);
-  if (printWindow) {
-    printWindow.focus();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
-  } else {
-    message.error('ไม่สามารถเปิดหน้าต่างพิมพ์ได้');
-  }
-}
 
   const [customerIdInput, setCustomerIdInput] = useState('');
   const [customerData, setCustomerData] = useState<any>(null);
@@ -233,7 +147,6 @@ export default function Finance() {
     }
   };
   useEffect(() => {
-    console.log('555>', customerData);
   }, [customerData]);
 
   const handleMenuClick = async (e: any) => {
@@ -301,7 +214,7 @@ export default function Finance() {
   const handleSave = async () => {
     try {
       // 1. customerID
-      console.log('customerData', customerData);
+      // console.log('customerData', customerData);
       if (!customerData || !customerData.CustomerID) {
         message.warning("กรุณาค้นหาและเลือกลูกค้าที่ถูกต้องก่อนทำการบันทึก");
         return;
@@ -720,11 +633,6 @@ export default function Finance() {
   const [value, setValue] = useState('');
   const [consultOption, setConsultOption] = useState('');
   
-  // const handleChange = (value: string) => {
-  //   console.log(`selected ${value}`);
-  // };
-
-
   return (
   <Layout style={{ minHeight: '100vh', padding: 10 }}>
     <Row>
@@ -814,6 +722,13 @@ export default function Finance() {
                               handleGetCustomer();
                             }
                           }}
+                          suffix={
+                            customerData?.Name ? (
+                              <CheckCircleOutlined style={{ color: "green" }} />
+                            ) : (
+                              <CloseCircleOutlined style={{ color: "red" }} />
+                            )
+                          }
                         />
                       </Col>
                       <Col style={{marginRight:20}}>
@@ -952,7 +867,7 @@ export default function Finance() {
                             type="primary"
                             disabled={selectedAddKeys.length === 0}
                             onClick={handleAddSelected}
-                            size="small"
+                           
                             style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }}
                           >
                             <PlusOutlined style={{ fontSize: 12, marginRight: 6 }} />
@@ -961,22 +876,23 @@ export default function Finance() {
                         </Col>
                         <Col>
                           <Button
-                            type="primary"
-                            danger
+                            className="delete-btn"
                             disabled={selectedDeleteKeys.length === 0}
                             onClick={() => {
                               setTableData(prev => prev.filter(item => !selectedDeleteKeys.includes(item.key)));
                               setSelectedDeleteKeys([]);
                             }}
-                            size="small"
-                            style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }}
                           >
                             <MinusOutlined style={{ fontSize: 12, marginRight: 6 }} />
                             ลบรายการ
                           </Button>
                         </Col>
                         <Col>
-                            <Button style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }} onClick={handlePrintPDF}>พิมพ์ PDF</Button>
+                          <Button className="export-btn" onClick={handlePrintPDF}>
+                            <FilePdfOutlined style={{ fontSize: 12, marginRight: 6 }} />
+                            พิมพ์ PDF
+                          </Button>
+
                         </Col>
                       </Row>
                     </ConfigProvider>
