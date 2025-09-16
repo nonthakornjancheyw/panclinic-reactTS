@@ -1,22 +1,24 @@
 // src/utils/generateFinancePDF.ts
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { registerTHSarabun } from '../utils/pdfFonts';
+import { registerTHSarabun } from './pdfFonts';
 const authen = JSON.parse(localStorage.getItem("authen") || "{}");
 const branchName = authen?.Info?.[0]?.BranchNameLogin || '-';
 
 export function generateFinancePDF(customerData: any, tableData: any[]) {
-  if (!customerData) throw new Error('กรุณาค้นหาลูกค้าก่อนพิมพ์ใบเสร็จ');
-  if (tableData.length === 0) throw new Error('ไม่มีรายการสินค้า');
-
-  const doc = new jsPDF();
+  
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
 
   if (typeof registerTHSarabun === "function") {
     registerTHSarabun(doc);
   }
 
   // ฟังก์ชันวาด header + page info (เดิม)
-  function drawHeader(pageNumber: number) {
+  function drawHeader(_pageNumber: number) {
     const now = new Date();
     const dateStr = now.toLocaleDateString('th-TH');
     const timeStr = now.toLocaleTimeString('th-TH');

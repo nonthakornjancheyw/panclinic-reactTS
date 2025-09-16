@@ -59,7 +59,7 @@ function LoginPage() {
         localStorage.setItem("authen", JSON.stringify(data.authen));
         localStorage.setItem("loginDate", data.loginDate || "");
         localStorage.setItem("passwordMemory", encodePassword(password));
-        navigate("/productAdmin");
+        navigate("/firstPage");
       } else {
         message.error(data.message || "Login ไม่สำเร็จ");
       }

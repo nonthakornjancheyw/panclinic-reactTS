@@ -13,9 +13,38 @@
 .ant-menu-submenu-popup .ant-menu-submenu-title {
   padding: 4px 12px important;
   height: auto !important;
-  line-height: 1.2 !important;
-  min-height: 24px !important;
+  line-height: 1.6 !important;
+  /* min-height: 24px !important; */
 }
+
+.search-btn {
+  background-image: linear-gradient(-30deg, #66b8fa 10%, #0080e9 100%) !important; 
+  color: #fff !important;
+  border-radius: 7px!important;
+  padding: 0 10px!important;
+  border: none!important;
+  transition: background 0.3s!important;
+}
+
+.search-btn:hover {
+  background-image: linear-gradient(-30deg, #4399df 10%, #0071ce 100%) !important; 
+}
+
+.add-btn {
+  background-image: linear-gradient(90deg, #4caf50 0%, #81c784 100%) !important; 
+  color: #fff !important;
+  border-radius: 7px!important;
+  padding: 0 10px!important;
+  height: 28px!important;
+  line-height: 28px!important;
+  border: none!important;
+  transition: background 0.3s!important;
+}
+
+.deleaddte-btn:hover {
+  background-image: linear-gradient(90deg, #388e3c 0%, #66bb6a 100%) !important;
+}
+
 
 .delete-btn {
   background-image: linear-gradient(-60deg, #f5413e 0%, #f57775 100%) !important; 
@@ -45,4 +74,33 @@
 
 .export-btn:hover {
   background-image: linear-gradient(-60deg, #fa4545 0%, #eb8b05 100%) !important;
+}
+
+.save-btn {
+  background-image: linear-gradient(90deg, #4caf50 0%, #81c784 100%) !important; 
+  color: #fff !important;
+  border-radius: 7px!important;
+  padding: 0 10px!important;
+  height: 28px!important;
+  line-height: 28px!important;
+  border: none!important;
+  transition: background 0.3s!important;
+}
+
+.save-btn:hover {
+  background-image: linear-gradient(90deg, #388e3c 0%, #66bb6a 100%) !important;
+}
+
+.add-btn:disabled,
+.add-btn[disabled],
+.delete-btn:disabled,
+.delete-btn[disabled],
+.export-btn:disabled,
+.export-btn[disabled] {
+  background-image: none !important;
+  background-color: #F5F5F5 !important; /* เทาแบบ antd */
+  color: #BEBEBE !important;
+  cursor: not-allowed !important;
+  border: 1px solid #DCDCDC!important;
+  box-shadow: none !important;
 }

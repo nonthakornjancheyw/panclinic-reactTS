@@ -3,7 +3,6 @@
 import { Layout, Menu, Button, Dropdown, Space, message, Modal, Grid, Avatar, Select } from 'antd';
 import {
   WalletOutlined,
-  InfoCircleOutlined,
   MenuUnfoldOutlined,
   MenuFoldOutlined,
   DownOutlined,
@@ -100,22 +99,16 @@ function AppLayout({ children, hasUnsavedChanges }: Props) {
         cancelText: "ยกเลิก",
         onOk: async () => {
           if (!tempBranch) return;
-
-          // 🔹 ใช้ passwordMemory ที่ decode แล้ว ลง API
           try {
             const data = await loginApi.Login(userInfo.employeeId, passwordMemory, tempBranch);
             if (data.success && data.user) {
 
               console.log(data,'<<<')
               message.success("เปลี่ยนสาขาเป็น " + data.authen?.Info?.[0]?.BranchNameLogin);
-
-              // อัปเดต localStorage / authen
               localStorage.setItem("branches", JSON.stringify(branches));
               localStorage.setItem("user", JSON.stringify(data.user));
               localStorage.setItem("authen", JSON.stringify(data.authen));
               localStorage.setItem("loginDate", data.loginDate || "");
-
-              // รีเฟรชหน้าใหม่
               navigate(location.pathname);
             } else {
               message.error(data.message || "เปลี่ยนสาขาไม่สำเร็จ");
@@ -190,17 +183,12 @@ function AppLayout({ children, hasUnsavedChanges }: Props) {
             {
               key: '/productAdmin',
               icon: <AppstoreOutlined style={{ color: '#fff' }} />,
-              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>บริการ</span>,
+              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>ส่วนบริการ</span>,
             },
             {
               key: '/finance',
               icon: <WalletOutlined style={{ color: '#fff' }} />,
               label: <span style={{ color: '#fff', fontWeight: 'bold' }}>การเงิน</span>,
-            },
-            {
-              key: '/about',
-              icon: <InfoCircleOutlined style={{ color: '#fff' }} />,
-              label: <span style={{ color: '#fff', fontWeight: 'bold' }}>เกี่ยวกับ</span>,
             },
           ]}
         />

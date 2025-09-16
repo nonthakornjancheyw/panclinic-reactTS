@@ -137,7 +137,7 @@ interface ProductAdminProps {
   setHasUnsavedChanges: (fn: () => boolean) => void;
 }
 
-export default function ProductAdminTable({ setHasUnsavedChanges }: ProductAdminProps) {
+export default function ProductAdminPage({ setHasUnsavedChanges }: ProductAdminProps) {
   const [spinning, setSpinning] = useState<boolean>(false); // loading 
   const [categoriesItem, setCategoriesItem] = useState<{rptCategoryID: string; rptCategoryName: string;}[]>([]);//เก็บประเภทcategory
 

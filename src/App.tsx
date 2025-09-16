@@ -2,8 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import Finance from './pages/finance/financePage';
-import Page1 from './pages/Page1';
-import ProductAdminTable from './pages/productAdmin/productAdminPage';
+import FirstPage from './pages/firstPage';
+import ProductAdminPage from './pages/productAdmin/productAdminPage';
 import LoginPage from './pages/login/LoginPage';
 
 function App() {
@@ -21,14 +21,14 @@ function App() {
         element={<AppLayout hasUnsavedChanges={unsavedCheck}><Finance /></AppLayout>}
       />
       <Route
-        path="/about"
-        element={<AppLayout hasUnsavedChanges={unsavedCheck}><Page1 /></AppLayout>}
+        path="/firstPage"
+        element={<AppLayout hasUnsavedChanges={unsavedCheck}><FirstPage /></AppLayout>}
       />
       <Route
         path="/productAdmin"
         element={
           <AppLayout hasUnsavedChanges={unsavedCheck}>
-            <ProductAdminTable setHasUnsavedChanges={setUnsavedCheck} />
+            <ProductAdminPage setHasUnsavedChanges={setUnsavedCheck} />
           </AppLayout>
         }
       />

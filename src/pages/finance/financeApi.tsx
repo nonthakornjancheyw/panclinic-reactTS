@@ -27,6 +27,16 @@ export async function GetProduct(href: string, maingroup: string, brand: string,
   }
 }
 
+export async function GetProductLikeName(nameProduct: string) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/finance/GetProductLikeName`, { branchID, nameProduct });
+    return response.data;
+  } catch (error) {
+    console.error(`GetProductLikeName error:`, error);
+    return { success: false };
+  }
+}
+
 export async function GetCustomer(customerID: string) {
   try {
     const response = await axios.post(`${BASE_URL}/api/finance/GetCustomer`, { customerID });

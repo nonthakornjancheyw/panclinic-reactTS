@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Menu, Checkbox, Button, Table, InputNumber, Select, 
   Card, Layout, ConfigProvider, Row, Col, Input, Typography, 
-  Divider, Radio, Space, message
+  Divider, Radio, Skeleton, Space, DatePicker, message
 } from 'antd';
+const { TextArea } = Input;
 const { Text } = Typography;
 import type { ColumnsType } from 'antd/es/table/interface';
-import { PlusOutlined, MinusOutlined, DownOutlined, UpOutlined, 
+import { PlusOutlined, MinusOutlined, DownOutlined, UpOutlined, SearchOutlined,
   FilePdfOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { renderCouponOptions, renderActivityOptions } from '../finance/selectOptions';
 import { v4 as uuidv4 } from 'uuid';
@@ -98,6 +99,8 @@ export default function Finance() {
   function handlePrintPDF() {
     try {
       // เรียกฟังก์ชัน generateFinancePDF เพื่อสร้าง PDF
+      if (!customerData) throw new Error('กรุณาค้นหาลูกค้าก่อนพิมพ์ใบเสร็จ');
+      if (tableData.length === 0) throw new Error('ไม่มีรายการสินค้า');
       const doc = generateFinancePDF(customerData, tableData);
 
       // แสดง/พิมพ์ PDF
@@ -149,6 +152,8 @@ export default function Finance() {
   useEffect(() => {
   }, [customerData]);
 
+  const [loadingItems, setLoadingItems] = useState(false);
+
   const handleMenuClick = async (e: any) => {
     setSelectedMenuKey(e.key);
 
@@ -164,6 +169,7 @@ export default function Finance() {
     if (href) {
       const [maingroup, brand, cls] = href.split(',');
       try {
+        setLoadingItems(true);
         const items = await financeApi.GetProduct(href, maingroup, brand, cls);
         const mapped = (Array.isArray(items) ? items : []).map((item: any) => ({
           id: item.ProductID,
@@ -177,13 +183,45 @@ export default function Finance() {
         setItemsToShow(mapped);
       } catch (err) {
         message.error('โหลดข้อมูลสินค้าไม่สำเร็จ');
+        console.error('GetProduct Error:', err);
         setItemsToShow([]);
+      } finally {
+        setLoadingItems(false);
       }
     } else {
       setItemsToShow([]);
     }
   };
   
+  const handleSearch = async (nameProduct: string) => {
+    if (!nameProduct || nameProduct.trim() === "") {
+      return;
+    }
+    console.log("ค้นหา:", nameProduct);
+    try {
+      setLoadingItems(true);
+      setSelectedMenuLabel(`ผลการค้นหา: ${nameProduct}`);
+      const items = await financeApi.GetProductLikeName(nameProduct);
+      const mapped = (Array.isArray(items) ? items : []).map((item: any) => ({
+        id: item.ProductID,
+        name: item.Name,
+        price: item.Price,
+        discount: 0,
+        maingroup: item.MainGroupID,
+        brand: item.Brand,
+        cls: item.Class,
+      }));
+      setItemsToShow(mapped);
+    } 
+    catch (err) {
+      message.error('โหลดข้อมูลสินค้าไม่สำเร็จ');
+      console.error('GetProduct Error:', err);
+      setItemsToShow([]);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
   const handleAddSelected = () => {
     const newProducts: Product[] = itemsToShow
       .filter(item => selectedAddKeys.includes(item.id))
@@ -339,7 +377,11 @@ export default function Finance() {
       const res = await financeApi.SaveReceipt(customerID, allTotal, paymentDetail, productDetail) as any;
       if (res && res.success) {
         message.success('บันทึกข้อมูลสำเร็จ');
-        handlePrintPDF();
+        setTimeout(() => {
+          handlePrintPDF();
+          reset();
+        }, 1500);
+
         reset();
       } else {
         message.error('บันทึกข้อมูลไม่สำเร็จ');
@@ -383,7 +425,7 @@ export default function Finance() {
     setSelectedMenuKey(null);
     setSelectedMenuLabel('');
     setItemsToShow([]);
-    setValue('');
+    setTypeService('');
     setConsultOption('');
   };
   
@@ -580,7 +622,7 @@ export default function Finance() {
   ];
 
   const milestone2 = ['M Plus Forte', 'Melaslin', 'VB Block', 'Sunscreen'];
-
+  const [searchProduct, setSearchProduct] = useState('');
   
   const [cashChecked, setCashChecked] = useState(false);
   const [cashValue, setCashValue] = useState('0');
@@ -630,67 +672,153 @@ export default function Finance() {
   const [lineCreditValue, setLineCreditValue] = useState('0');
   const [lineCreditCardTypes, setLineCreditCardTypes] = useState('-');
 
-  const [value, setValue] = useState('');
+  const [typeService, setTypeService] = useState('');
   const [consultOption, setConsultOption] = useState('');
   
+
+  const [chk1, setChk1] = useState(false); // รับคืน
+  const [chk2, setChk2] = useState(false); // ลด on top
+  const [chk3, setChk3] = useState(false); // ใช้คะแนน
+  const [chk4, setChk4] = useState(false); // คะแนนสะสมเต็ม
+  const [scoreInput, setScoreInput] = useState(""); // input ของ checkbox 3
+
+  const handleChk2 = (e: any) => {
+    const val = e.target.checked;
+    setChk2(val);
+    if (val) setChk4(false); // 2 หรือ 3 ตรงข้าม 4
+  };
+
+  const handleChk3 = (e: any) => {
+    const val = e.target.checked;
+    setChk3(val);
+    if (val) {
+      setChk4(false); // 2 หรือ 3 ตรงข้าม 4
+    } else {
+      setScoreInput(""); // เคลียร์ input
+    }
+  };
+
+  const handleChk4 = (e: any) => {
+    const val = e.target.checked;
+    setChk4(val);
+    if (val) {
+      setChk2(false);
+      setChk3(false);
+      setScoreInput("");
+    }
+  };
+  // ------------------------------------------------
+
+  const [timeOption, setTimeOption] = useState("noTime");
+  const [hour, setHour] = useState("10");
+  const [minute, setMinute] = useState("00");
+
+  const hours = Array.from({ length: 10 }, (_, i) => (i + 10).toString()); // 10 - 19
+  const minutes = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0")); // 00,05,...55
+  // -------------------------------------------------
+  const [isAppoint, setIsAppoint] = useState(false);   // true = นัดหมาย, false = ไม่นัดหมาย
+  const [appointDate, setAppointDate] = useState(null);
+  const [appointType, setAppointType] = useState(null);
+  const [remark, setRemark] = useState("");
+
+  // function แปลงเวลาเป็น HH:mm
+  const getFinalTime = () => {
+    if (timeOption === "noTime") {
+      return "00:00";
+    }
+    return `${hour ?? "00"}:${minute ?? "00"}`;
+  };
+
   return (
   <Layout style={{ minHeight: '100vh', padding: 10 }}>
     <Row>
       <Col>     
         <Row gutter={[8, 8]} style={{ height: '100vh' }} wrap>
           {/* Sider Menu */}
-          <Col xs={24} md={3}>
-            <Menu
-              mode="vertical" //inline
-              selectedKeys={selectedMenuKey ? [selectedMenuKey] : []}
-              items={menuItems}
-              onClick={handleMenuClick}
-              style={{ 
-                height: '100%', overflowY: 'auto',
-                borderRadius: 8, 
-                boxShadow: '0 0 8px rgba(0,0,0,0.1)',
-              }}
-              className="compact-menu"
-            />     
-          </Col>
-          {/* รายการสินค้า */}
-          <Col xs={24} md={4}>
-            <div
-              style={{
-                background: '#fff',
-                padding: 16,
-                boxShadow: '0 0 8px rgba(0,0,0,0.1)',
-                height: '100%',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                borderRadius: 8,
-              }}
-            >
-              <h3 style={{ marginBottom: 16 }}>
-                {selectedMenuLabel || 'กรุณาเลือกหมวดหมู่สินค้า'}
-              </h3>
-              <div style={{ flexGrow: 1, overflowY: 'auto' }}>
-                {itemsToShow.length === 0 && <p>-</p>}
-                {itemsToShow.map(item => (
-                  <div
-                    key={item.id}
-                    style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 8 }}
-                  >
-                    <Checkbox
-                      checked={selectedAddKeys.includes(item.id)}
-                      onChange={e => {
-                        const checked = e.target.checked;
-                        setSelectedAddKeys(prev =>
-                          checked ? [...prev, item.id] : prev.filter(id => id !== item.id),
-                        );
-                      }}
-                    />
-                    <span style={{ marginLeft: 8 }}>{item.name}</span>
+          <Col xs={24} md={7} >
+            <Row gutter={[5, 5]} style={{ marginBottom: 8 }}>
+              <Col xs={24} md={20}>
+                <Input
+                  placeholder="ค้นหาสินค้า"
+                  value={searchProduct}
+                  onChange={(e) => setSearchProduct(e.target.value)}
+                  onPressEnter={() => handleSearch(searchProduct)} // ✅ Enter = เรียก handleSearch
+                />     
+              </Col>
+              <Col xs={24} md={2}>
+                <Button 
+                  className="search-btn"
+                  onClick={() => handleSearch(searchProduct)} // ✅ ปุ่ม = เรียก handleSearch
+                >
+                  ค้นหา <SearchOutlined />
+                </Button>   
+              </Col>
+            </Row>
+
+            <Row gutter={[8, 8]} style={{ minHeight: '100vh' }} wrap>
+              <Col xs={24} md={10}>
+                <Menu
+                  mode="vertical" //inline
+                  selectedKeys={selectedMenuKey ? [selectedMenuKey] : []}
+                  items={menuItems}
+                  onClick={handleMenuClick}
+                  style={{ 
+                    height: '100%', overflowY: 'auto',
+                    borderRadius: 8, 
+                    boxShadow: '0 0 8px rgba(0,0,0,0.1)',
+                  }}
+                  className="compact-menu"
+                />     
+              </Col>
+              {/* รายการสินค้า */}
+              <Col xs={24} md={14}>
+                <div
+                  style={{
+                    background: '#fff',
+                    padding: 16,
+                    boxShadow: '0 0 8px rgba(0,0,0,0.1)',
+                    height: '100%',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    borderRadius: 8,
+                  }}
+                >
+                  <h3 style={{ marginBottom: 16 }}>
+                    {selectedMenuLabel || 'กรุณาเลือกหมวดหมู่สินค้า'}
+                  </h3>
+                  <div style={{ flexGrow: 1, overflowY: "auto" }}>
+                    {loadingItems ? (
+                      <>
+                        <Skeleton active paragraph={{ rows: 2 }} />
+                        <Skeleton active paragraph={{ rows: 2 }} />
+                      </>
+                    ) : itemsToShow.length === 0 ? (
+                      <p>-</p>
+                    ) : (
+                      itemsToShow.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{ display: "flex", alignItems: "flex-start", marginBottom: 8 }}
+                        >
+                          <Checkbox
+                            checked={selectedAddKeys.includes(item.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSelectedAddKeys((prev) =>
+                                checked ? [...prev, item.id] : prev.filter((id) => id !== item.id)
+                              );
+                            }}
+                          />
+                          <span style={{ marginLeft: 8 }}>{item.name}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
+
+                </div>
+              </Col>
+            </Row>
           </Col>
           {/* ตาราง */}
           <Col xs={24} md={17}>         
@@ -864,11 +992,9 @@ export default function Finance() {
                       <Row gutter={8}>
                         <Col>
                           <Button
-                            type="primary"
+                            className="add-btn"
                             disabled={selectedAddKeys.length === 0}
                             onClick={handleAddSelected}
-                           
-                            style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }}
                           >
                             <PlusOutlined style={{ fontSize: 12, marginRight: 6 }} />
                             เพิ่มรายการ
@@ -888,7 +1014,11 @@ export default function Finance() {
                           </Button>
                         </Col>
                         <Col>
-                          <Button className="export-btn" onClick={handlePrintPDF}>
+                          <Button 
+                            className="export-btn" 
+                            //disabled={!customerData || tableData.length === 0}
+                            onClick={handlePrintPDF}
+                            >
                             <FilePdfOutlined style={{ fontSize: 12, marginRight: 6 }} />
                             พิมพ์ PDF
                           </Button>
@@ -1316,7 +1446,7 @@ export default function Finance() {
 
                   {/* Col 2: ตัวเลือกหลัก */}
                   <Col md={8}>
-                    <Radio.Group onChange={(e) => setValue(e.target.value)} value={value}>
+                    <Radio.Group onChange={(e) => setTypeService(e.target.value)} value={typeService}>
                       <Row>
                         <Col>
                           <Radio value="line">มารับบริการที่สาขา(LinePBC)</Radio>
@@ -1348,7 +1478,7 @@ export default function Finance() {
 
                   {/* Col 3: เงื่อนไขเฉพาะเมื่อเลือก "online" */}
                   <Col>
-                    {value === 'online' && (
+                    {typeService === 'online' && (
                       <>
                         <Space direction="vertical" size="middle">
                           <Radio.Group
@@ -1377,13 +1507,171 @@ export default function Finance() {
                     )}
                   </Col>
                 </Row>
-                <Divider style={{ borderColor: '#7cb305' }}>Solid</Divider>
-                <Row gutter={8} style={{ marginBottom: 8 }}>
-                    <Button
-                      type="primary"
-                      onClick={handleSave}
+                <Divider style={{ borderColor: '#7cb305' }}></Divider>
+
+                <Row gutter={8}>
+                  <Col md={24}>
+                    <Checkbox 
+                      style={{ color: "#990000" }}
+                      checked={chk1} 
+                      onChange={e => setChk1(e.target.checked)}>
+                      รับคืน(RU)ให้สาขาแพนบิวตี้
+                    </Checkbox>
+                  </Col>
+                </Row>
+
+                <Row gutter={8}>
+                  <Col md={24}>
+                    <Checkbox checked={chk2} onChange={handleChk2}>
+                      ลด on top 5% เฉพาะสั่งซื้อ Online ครั้งแรกเท่านั้น
+                    </Checkbox>
+                  </Col>
+                </Row>
+
+                <Row gutter={8}>
+                  <Col>
+                    <Checkbox checked={chk3} onChange={handleChk3}>
+                      ใช้คะแนน
+                    </Checkbox>
+                  </Col>
+                  <Col md={2}>
+                    <Input 
+                      size='small'
+                      value={scoreInput} 
+                      onChange={e => setScoreInput(e.target.value)} 
+                      disabled={!chk3} 
+                    />
+                  </Col>
+                </Row>
+
+                <Row gutter={8}>
+                  <Col md={24}>
+                    <Checkbox checked={chk4} onChange={handleChk4}>
+                      ใช้คะแนนเสะสมเท่ากับยอดซื้อเพื่อรับส่วนลด on top 5% (คะแนนสะสมคงเหลือ : -  คะแนน)
+                    </Checkbox>
+                  </Col>
+                </Row>
+
+                <Row gutter={8} style={{ marginBottom: 2, marginTop: 16, marginLeft: 60 }}>
+                  <Col style={{ width: 100, textAlign: "right" }}>
+                    <b style={{ textDecoration: "underline" }}>การนัดหมาย</b>
+                  </Col>
+                </Row>
+
+                {/* ไม่นัดหมาย */}
+                <Row gutter={8} style={{ marginBottom: 8, marginLeft: 60 }}>
+                  <Col style={{ width: 100, textAlign: "right" }}>
+                    <Checkbox
+                      checked={!isAppoint}
+                      onChange={(e) => setIsAppoint(!e.target.checked)}
+                    />
+                  </Col>
+                  <Col>
+                    ไม่นัดหมาย
+                  </Col>
+                </Row>
+
+                {/* นัดหมาย + วันที่ */}
+                <Row gutter={8} style={{ marginBottom: 8, marginLeft: 60 }}>
+                  <Col style={{ width: 100, textAlign: "right" }}>
+                    <Checkbox
+                      checked={isAppoint}
+                      onChange={(e) => setIsAppoint(e.target.checked)}
+                    />
+                  </Col>
+                  <Col>
+                    <DatePicker
                       size="small"
-                      style={{ borderRadius: 7, padding: '0 10px', height: 28, lineHeight: '28px' }}
+                      value={appointDate}
+                      onChange={(val) => setAppointDate(val)}
+                      disabled={!isAppoint}
+                    />
+                  </Col>
+                </Row>
+
+                {/* เวลา */}
+                <Row gutter={8} style={{ marginBottom: 8, marginLeft: 60 }}>
+                  <Col style={{ width: 100, textAlign: "right" }}>เวลา :</Col>
+                  <Col>
+                    <Radio.Group
+                      value={timeOption}
+                      onChange={(e) => setTimeOption(e.target.value)}
+                      disabled={!isAppoint}
+                    >
+                      <Radio value="setTime">
+                        ระบุเวลา{" "}
+                        {timeOption === "setTime" && (
+                          <>
+                            <Select
+                              size="small"
+                              value={hour}
+                              onChange={(val) => setHour(val)}
+                              style={{ width: 80, marginLeft: 8, marginRight: 8 }}
+                            >
+                              {hours.map((h) => (
+                                <Option key={h} value={h}>
+                                  {h}
+                                </Option>
+                              ))}
+                            </Select>
+                            <Select
+                              size="small"
+                              value={minute}
+                              onChange={(val) => setMinute(val)}
+                              style={{ width: 80 }}
+                            >
+                              {minutes.map((m) => (
+                                <Option key={m} value={m}>
+                                  {m.toString().padStart(2, "0")} น.
+                                </Option>
+                              ))}
+                            </Select>
+                          </>
+                        )}
+                      </Radio>
+                      <Radio value="noTime" style={{ display: "block", marginTop: 4 }}>
+                        ไม่ระบุเวลา
+                      </Radio>
+                    </Radio.Group>
+                  </Col>
+                </Row>
+
+                {/* ประเภทการนัด */}
+                <Row gutter={8} style={{ marginBottom: 8, marginLeft: 60 }}>
+                  <Col style={{ width: 100, textAlign: "right" }}>ประเภทการนัด :</Col>
+                  <Col>
+                    <Select
+                      size="small"
+                      style={{ width: 200 }}
+                      value={appointType}
+                      onChange={(val) => setAppointType(val)}
+                      disabled={!isAppoint}
+                    >
+                      <Option value="checkup">นัดตรวจ / พบแพทย์</Option>
+                      <Option value="treatment">นัดทำ Treatment</Option>
+                    </Select>
+                  </Col>
+                </Row>
+
+                {/* หมายเหตุ */}
+                <Row gutter={8} style={{ marginBottom: 8, marginLeft: 60 }}>
+                  <Col style={{ width: 100, textAlign: "right" }}>หมายเหตุ :</Col>
+                  <Col flex={1}>
+                    <TextArea
+                      rows={3}
+                      style={{ width: 400 }}
+                      value={remark}
+                      onChange={(e) => setRemark(e.target.value)}
+                      disabled={!isAppoint}
+                    />
+                  </Col>
+                </Row>
+
+
+                <Row gutter={8}>
+                    <Button
+                      className="save-btn" 
+                      onClick={handleSave}
                     >
                       บันทึก
                     </Button>
